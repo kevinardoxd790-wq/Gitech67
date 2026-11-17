@@ -1,0 +1,6 @@
+{
+  "name": "GoTech SV",
+  "description": "Tienda de accesorios tecnológicos en San Salvador. Adaptadores Bluetooth, controles remotos y más.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}

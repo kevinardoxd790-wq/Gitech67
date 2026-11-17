@@ -1,0 +1,176 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    // Global Safety Net: Default-deny catch-all
+    match /{document=**} {
+      allow read, write: if false;
+    }
+
+    function isValidId(id) {
+      return id is string && id.size() > 0 && id.size() <= 128 && id.matches('^[a-zA-Z0-9_\\-]+$');
+    }
+
+    function incoming() {
+      return request.resource.data;
+    }
+
+    function existing() {
+      return resource.data;
+    }
+
+    function isValidAdminPasskeyConfig(data) {
+      return data.keys().hasAll(['verifierHash', 'updatedAt']) &&
+        data.keys().hasOnly(['verifierHash', 'updatedAt']) &&
+        data.verifierHash is string &&
+        data.verifierHash.size() == 64 &&
+        data.verifierHash.matches('^[a-f0-9]{64}$') &&
+        data.updatedAt is timestamp &&
+        data.updatedAt == request.time;
+    }
+
+    function isValidAdminStatus(data) {
+      return data.keys().hasAll(['configured', 'updatedAt']) &&
+        data.keys().hasOnly(['configured', 'updatedAt']) &&
+        data.configured is bool &&
+        data.configured == true &&
+        data.updatedAt is timestamp &&
+        data.updatedAt == request.time;
+    }
+
+    function isValidAdminAuthCheck(data) {
+      return data.keys().hasAll(['proof', 'updatedAt']) &&
+        data.keys().hasOnly(['proof', 'updatedAt']) &&
+        data.proof is string &&
+        data.proof.size() == 64 &&
+        data.proof.matches('^[a-f0-9]{64}$') &&
+        data.updatedAt is timestamp &&
+        data.updatedAt == request.time;
+    }
+
+    function isVerifiedPasswordBatch() {
+      return existsAfter(/databases/$(database)/documents/admin_auth_checks/session) &&
+        getAfter(/databases/$(database)/documents/admin_auth_checks/session).data.updatedAt == request.time;
+    }
+
+    function isValidProductImage(image) {
+      return image is string &&
+        image.size() >= 1 &&
+        image.size() <= 250000 &&
+        (
+          image.matches('^https?://.*') ||
+          image.matches('^/.*') ||
+          image.matches('^data:image/(jpeg|jpg|png|webp|gif);base64,[A-Za-z0-9+/=]+$')
+        );
+    }
+
+    function isValidCatalogProduct(data) {
+      return data.keys().hasAll(['name', 'description', 'image', 'price', 'published', 'updatedAt']) &&
+        data.keys().hasOnly(['name', 'description', 'image', 'price', 'published', 'deleted', 'updatedAt']) &&
+        data.name is string &&
+        data.name.size() >= 1 &&
+        data.name.size() <= 160 &&
+        data.description is string &&
+        data.description.size() >= 1 &&
+        data.description.size() <= 1000 &&
+        isValidProductImage(data.image) &&
+        data.price is number &&
+        data.price >= 0 &&
+        data.price <= 10000 &&
+        data.published is bool &&
+        data.published == true &&
+        (!('deleted' in data) || data.deleted is bool) &&
+        data.updatedAt is timestamp &&
+        data.updatedAt == request.time;
+    }
+
+    function isValidCatalogBundle(data) {
+      return data.keys().hasAll(['name', 'tagline', 'image', 'bundlePrice', 'published', 'updatedAt']) &&
+        data.keys().hasOnly(['name', 'tagline', 'image', 'bundlePrice', 'published', 'updatedAt']) &&
+        data.name is string &&
+        data.name.size() >= 1 &&
+        data.name.size() <= 160 &&
+        data.tagline is string &&
+        data.tagline.size() >= 1 &&
+        data.tagline.size() <= 1000 &&
+        data.image is string &&
+        data.image.size() <= 1000 &&
+        data.bundlePrice is number &&
+        data.bundlePrice >= 0 &&
+        data.bundlePrice <= 10000 &&
+        data.published is bool &&
+        data.published == true &&
+        data.updatedAt is timestamp &&
+        data.updatedAt == request.time;
+    }
+
+    match /admin_settings/{settingId} {
+      allow get: if isValidId(settingId) &&
+        settingId == 'status' &&
+        (resource == null || existing().configured == true);
+      allow list: if false;
+      allow create: if isValidId(settingId) && (
+        (
+          settingId == 'knas_access' &&
+          isValidAdminPasskeyConfig(incoming()) &&
+          incoming().verifierHash == 'a57610610d9b5a523a7b28e26eda59ef7194c7470fcefe9f1959899c431f3cc4' &&
+          !exists(/databases/$(database)/documents/admin_settings/status) &&
+          existsAfter(/databases/$(database)/documents/admin_settings/status)
+        ) ||
+        (
+          settingId == 'status' &&
+          isValidAdminStatus(incoming()) &&
+          !exists(/databases/$(database)/documents/admin_settings/knas_access) &&
+          existsAfter(/databases/$(database)/documents/admin_settings/knas_access)
+        )
+      );
+      allow update: if isValidId(settingId) &&
+        settingId == 'knas_access' &&
+        isValidAdminPasskeyConfig(incoming()) &&
+        incoming().diff(existing()).affectedKeys().hasOnly(['verifierHash', 'updatedAt']) &&
+        isVerifiedPasswordBatch();
+      allow delete: if false;
+    }
+
+    match /admin_auth_checks/{checkId} {
+      allow get, list: if false;
+      allow create: if isValidId(checkId) &&
+        checkId == 'session' &&
+        isValidAdminAuthCheck(incoming()) &&
+        exists(/databases/$(database)/documents/admin_settings/knas_access) &&
+        hashing.sha256(incoming().proof).toHexString().lower() == get(/databases/$(database)/documents/admin_settings/knas_access).data.verifierHash;
+      allow update: if isValidId(checkId) &&
+        checkId == 'session' &&
+        isValidAdminAuthCheck(incoming()) &&
+        incoming().diff(existing()).affectedKeys().hasOnly(['proof', 'updatedAt']) &&
+        exists(/databases/$(database)/documents/admin_settings/knas_access) &&
+        hashing.sha256(incoming().proof).toHexString().lower() == get(/databases/$(database)/documents/admin_settings/knas_access).data.verifierHash;
+      allow delete: if false;
+    }
+
+    match /catalog_products/{productId} {
+      allow get: if isValidId(productId) && existing().published == true;
+      allow list: if existing().published == true;
+      allow create: if isValidId(productId) &&
+        isValidCatalogProduct(incoming()) &&
+        isVerifiedPasswordBatch();
+      allow update: if isValidId(productId) &&
+        isValidCatalogProduct(incoming()) &&
+        incoming().diff(existing()).affectedKeys().hasOnly(['name', 'description', 'image', 'price', 'published', 'deleted', 'updatedAt']) &&
+        isVerifiedPasswordBatch();
+      allow delete: if isValidId(productId) && isVerifiedPasswordBatch();
+    }
+
+    match /catalog_bundles/{bundleId} {
+      allow get: if isValidId(bundleId) && existing().published == true;
+      allow list: if existing().published == true;
+      allow create: if isValidId(bundleId) &&
+        isValidCatalogBundle(incoming()) &&
+        isVerifiedPasswordBatch();
+      allow update: if isValidId(bundleId) &&
+        isValidCatalogBundle(incoming()) &&
+        incoming().diff(existing()).affectedKeys().hasOnly(['name', 'tagline', 'image', 'bundlePrice', 'published', 'updatedAt']) &&
+        isVerifiedPasswordBatch();
+      allow delete: if isValidId(bundleId) && isVerifiedPasswordBatch();
+    }
+  }
+}

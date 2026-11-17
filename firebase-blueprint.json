@@ -1,0 +1,175 @@
+{
+  "entities": {
+    "AdminPasskeyConfig": {
+      "title": "AdminPasskeyConfig",
+      "description": "Double-hashed SHA-256 verifier and timestamp for password-only KNAS admin access.",
+      "type": "object",
+      "properties": {
+        "verifierHash": {
+          "type": "string",
+          "description": "Hex-encoded SHA-256 hash of the admin password proof.",
+          "minLength": 64,
+          "maxLength": 64,
+          "pattern": "^[a-f0-9]{64}$"
+        },
+        "updatedAt": {
+          "type": "string",
+          "format": "date-time",
+          "description": "Server timestamp of when the admin password was created or updated."
+        }
+      },
+      "required": ["verifierHash", "updatedAt"]
+    },
+    "AdminStatusConfig": {
+      "title": "AdminStatusConfig",
+      "description": "Public boolean flag indicating whether the KNAS admin password has been initialized.",
+      "type": "object",
+      "properties": {
+        "configured": {
+          "type": "boolean",
+          "description": "True once knas_access has been configured."
+        },
+        "updatedAt": {
+          "type": "string",
+          "format": "date-time",
+          "description": "Server timestamp of initial setup."
+        }
+      },
+      "required": ["configured", "updatedAt"]
+    },
+    "AdminAuthCheck": {
+      "title": "AdminAuthCheck",
+      "description": "Write-only verification gate document validating password proof in Firestore rules.",
+      "type": "object",
+      "properties": {
+        "proof": {
+          "type": "string",
+          "description": "Hex-encoded SHA-256 proof derived from the admin password.",
+          "minLength": 64,
+          "maxLength": 64,
+          "pattern": "^[a-f0-9]{64}$"
+        },
+        "updatedAt": {
+          "type": "string",
+          "format": "date-time",
+          "description": "Server timestamp matching request.time for atomic batch verification."
+        }
+      },
+      "required": ["proof", "updatedAt"]
+    },
+    "CatalogProductOverride": {
+      "title": "CatalogProductOverride",
+      "description": "Admin-editable fields (image, title, description, price, deleted) for a store product.",
+      "type": "object",
+      "properties": {
+        "name": {
+          "type": "string",
+          "description": "Product display title.",
+          "minLength": 1,
+          "maxLength": 160
+        },
+        "description": {
+          "type": "string",
+          "description": "Product description.",
+          "minLength": 1,
+          "maxLength": 1000
+        },
+        "image": {
+          "type": "string",
+          "description": "Product image URL or compressed gallery data URI.",
+          "minLength": 1,
+          "maxLength": 250000
+        },
+        "price": {
+          "type": "number",
+          "description": "Product price in USD."
+        },
+        "published": {
+          "type": "boolean",
+          "description": "Whether this override is synchronized with the storefront."
+        },
+        "deleted": {
+          "type": "boolean",
+          "description": "True when the admin has deleted this product from the catalog."
+        },
+        "updatedAt": {
+          "type": "string",
+          "format": "date-time",
+          "description": "Server timestamp of the last edit."
+        }
+      },
+      "required": ["name", "description", "image", "price", "published", "updatedAt"]
+    },
+    "CatalogBundleOverride": {
+      "title": "CatalogBundleOverride",
+      "description": "Admin-editable fields (image, title, description, price) for a store bundle/combo.",
+      "type": "object",
+      "properties": {
+        "name": {
+          "type": "string",
+          "description": "Combo display title.",
+          "minLength": 1,
+          "maxLength": 160
+        },
+        "tagline": {
+          "type": "string",
+          "description": "Combo description / tagline.",
+          "minLength": 1,
+          "maxLength": 1000
+        },
+        "image": {
+          "type": "string",
+          "description": "Optional custom combo image URL.",
+          "minLength": 0,
+          "maxLength": 1000
+        },
+        "bundlePrice": {
+          "type": "number",
+          "description": "Combo price in USD."
+        },
+        "published": {
+          "type": "boolean",
+          "description": "Whether this combo override is publicly visible on the storefront."
+        },
+        "updatedAt": {
+          "type": "string",
+          "format": "date-time",
+          "description": "Server timestamp of the last edit."
+        }
+      },
+      "required": ["name", "tagline", "image", "bundlePrice", "published", "updatedAt"]
+    }
+  },
+  "firestore": {
+    "/admin_settings/knas_access": {
+      "schema": {
+        "$ref": "#/entities/AdminPasskeyConfig"
+      },
+      "description": "Write-only after initial setup; stores the SHA-256 verifier hash of the KNAS admin password."
+    },
+    "/admin_settings/status": {
+      "schema": {
+        "$ref": "#/entities/AdminStatusConfig"
+      },
+      "description": "Publicly gettable setup flag indicating whether KNAS password has been configured."
+    },
+    "/admin_auth_checks/{checkId}": {
+      "schema": {
+        "$ref": "#/entities/AdminAuthCheck"
+      },
+      "description": "Write-only password proof gate verified via hashing.sha256 in Firestore rules."
+    },
+    "/catalog_products/{productId}": {
+      "schema": {
+        "$ref": "#/entities/CatalogProductOverride"
+      },
+      "description": "Admin-editable overrides for storefront products."
+    },
+    "/catalog_bundles/{bundleId}": {
+      "schema": {
+        "$ref": "#/entities/CatalogBundleOverride"
+      },
+      "description": "Admin-editable overrides for storefront combos/bundles."
+    }
+  }
+}
