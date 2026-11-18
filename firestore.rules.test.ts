@@ -70,6 +70,23 @@ export async function runDirtyDozenChecks() {
         updatedAt: new Date(),
       })
     );
+    // 9. Public read of custom product with category/stock allowed when published
+    await testEnv.withSecurityRulesDisabled(async (ctx) => {
+      await ctx.firestore().collection("catalog_products").doc("audifonos-pro-1").set({
+        name: "Audífonos Pro",
+        description: "Sonido HD",
+        image: "https://example.com/headphones.png",
+        price: 14.99,
+        category: "Audio",
+        stock: 10,
+        badge: "🆕 NUEVO",
+        isCustom: true,
+        published: true,
+        deleted: false,
+        updatedAt: new Date(),
+      });
+    });
+    await assertSucceeds(anon.collection("catalog_products").doc("audifonos-pro-1").get());
   } finally {
     await testEnv.cleanup();
   }

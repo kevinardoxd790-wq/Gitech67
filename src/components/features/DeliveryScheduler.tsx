@@ -19,7 +19,7 @@ import { useCatalog } from "@/hooks/useCatalog";
 type Step = "calendar" | "form" | "confirm";
 
 export default function DeliveryScheduler() {
-  const { products: PRODUCTS, bundles: BUNDLES } = useCatalog();
+  const { products: PRODUCTS } = useCatalog();
   const [days] = useState(() => getNextDays(7));
   const [selectedDay, setSelectedDay] = useState<Date>(days[0]);
   const [selectedHour, setSelectedHour] = useState<number | null>(null);
@@ -318,11 +318,6 @@ export default function DeliveryScheduler() {
                     {PRODUCTS.map((p) => (
                       <option key={p.id} value={p.name} className="bg-dark-800">
                         {p.name} — ${Number(p.price).toFixed(2)}
-                      </option>
-                    ))}
-                    {BUNDLES.map((b) => (
-                      <option key={b.id} value={`${b.name} (Combo)`} className="bg-dark-800">
-                        {b.name} (Combo) — ${Number(b.bundlePrice).toFixed(2)}
                       </option>
                     ))}
                     <option value="Otro producto" className="bg-dark-800">Otro producto</option>

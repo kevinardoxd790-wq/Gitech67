@@ -27,7 +27,8 @@ export default function OrderTicketModal({ onClose }: OrderTicketModalProps) {
     0
   );
 
-  const shippingZones = getShippingZones(subtotal);
+  const totalItems = items.reduce((sum, { quantity }) => sum + quantity, 0);
+  const shippingZones = getShippingZones(subtotal, totalItems);
   const selectedZoneObj = shippingZones.find((z) => z.name === selectedZone);
   const shippingCost = selectedZoneObj?.cost ?? null;
   const totalWithShipping = shippingCost !== null ? subtotal + shippingCost : subtotal;
@@ -138,6 +139,11 @@ export default function OrderTicketModal({ onClose }: OrderTicketModalProps) {
                     </div>
                     <span className={`text-[11px] font-semibold leading-tight ${selectedZone === zone.name ? "text-white" : "text-white/60"}`}>
                       {zone.name}
+                      {zone.note && (
+                        <span className="block text-[10px] text-orange-300/80 font-normal">
+                          {zone.note}
+                        </span>
+                      )}
                     </span>
                   </div>
                   <span className={`text-[11px] font-black shrink-0 ml-2 ${zone.cost === 0 ? "text-green-400" : "text-orange-400"}`}>

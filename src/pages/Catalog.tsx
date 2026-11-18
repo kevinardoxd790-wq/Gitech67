@@ -3,13 +3,21 @@ import { Search, Filter } from "lucide-react";
 import { useCatalog } from "@/hooks/useCatalog";
 import ProductCard from "@/components/features/ProductCard";
 import AiHelpBanner from "@/components/features/AiHelpBanner";
+import { WHATSAPP_NUMBER } from "@/constants/products";
 
-const categories = ["Todos", "Bluetooth", "Memorias", "Controles", "Accesorios Moto", "Accesorios Auto"];
+const BASE_CATEGORIES = ["Todos", "Bluetooth", "Memorias", "Controles", "Accesorios Moto", "Accesorios Auto"];
 
 export default function Catalog() {
   const { products: PRODUCTS } = useCatalog();
   const [search, setSearch] = useState("");
   const [activeCategory, setActiveCategory] = useState("Todos");
+
+  const categories = Array.from(
+    new Set([
+      ...BASE_CATEGORIES,
+      ...PRODUCTS.map((p) => p.category).filter(Boolean),
+    ])
+  );
 
   const filtered = PRODUCTS.filter((p) => {
     const matchesSearch =
@@ -53,7 +61,7 @@ export default function Catalog() {
           </div>
 
           {/* Category filter */}
-          <div className="flex items-center gap-2">
+          <div className="flex items-center flex-wrap gap-2">
             <Filter className="w-4 h-4 text-neon-cyan/50 shrink-0" />
             {categories.map((cat) => (
               <button
@@ -91,7 +99,7 @@ export default function Catalog() {
           <h3 className="font-orbitron font-bold text-xl text-white mb-2">¿No encuentras lo que buscas?</h3>
           <p className="text-white/50 text-sm mb-6">Escríbenos por WhatsApp y te ayudamos a encontrar el accesorio perfecto.</p>
           <a
-            href="https://wa.me/50379433144"
+            href={`https://wa.me/${WHATSAPP_NUMBER}`}
             target="_blank"
             rel="noopener noreferrer"
             className="btn-neon inline-flex items-center gap-2"

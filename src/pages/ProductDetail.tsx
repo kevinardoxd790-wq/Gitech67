@@ -1,16 +1,13 @@
-import { useState } from "react";
 import { useParams, Link } from "react-router-dom";
-import { CheckCircle, ChevronLeft, MessageCircle, Truck, Zap, MapPin, ShoppingCart } from "lucide-react";
+import { CheckCircle, ChevronLeft, MessageCircle, Truck, Zap, ShoppingCart } from "lucide-react";
 import { useCatalog } from "@/hooks/useCatalog";
 import { useCart } from "@/hooks/useCart";
-import AddressPickerModal from "@/components/features/AddressPickerModal";
 
 export default function ProductDetail() {
   const { id } = useParams<{ id: string }>();
   const { products: PRODUCTS } = useCatalog();
   const product = PRODUCTS.find((p) => p.id === id);
-  const { addToCart, items, address, coordinates, setLocation, openCart } = useCart();
-  const [showAddressPicker, setShowAddressPicker] = useState(false);
+  const { addToCart, items, openCart } = useCart();
 
   if (!product) {
     return (
@@ -114,29 +111,8 @@ export default function ProductDetail() {
             {/* Delivery */}
             <div className="flex items-center gap-2 text-green-400 text-sm font-semibold mb-5">
               <Truck className="w-4 h-4" />
-              Envío gratis en zonas seleccionadas
+              Envío gratis desde $4.99 (más de $6.99 incluye Salvador del Mundo)
             </div>
-
-            {/* Address section */}
-            <button
-              onClick={() => setShowAddressPicker(true)}
-              className="flex items-center gap-2 bg-dark-700 border border-neon-cyan/20 hover:border-neon-cyan/50 rounded-xl px-4 py-3 mb-5 w-full transition-all group text-left"
-            >
-              <MapPin className="w-4 h-4 text-neon-cyan shrink-0" />
-              <div className="flex-1 min-w-0">
-                {address ? (
-                  <>
-                    <p className="text-[10px] text-neon-cyan/60 uppercase tracking-wider font-bold">Tu dirección</p>
-                    <p className="text-white text-sm truncate">{address}</p>
-                  </>
-                ) : (
-                  <p className="text-white/40 text-sm">Agregar dirección de entrega (opcional)</p>
-                )}
-              </div>
-              <span className="text-neon-cyan/40 group-hover:text-neon-cyan text-xs shrink-0">
-                {address ? "Cambiar" : "Agregar"}
-              </span>
-            </button>
 
             {/* CTAs */}
             <div className="space-y-3">
@@ -201,16 +177,6 @@ export default function ProductDetail() {
           </div>
         )}
       </div>
-
-      {/* Address Picker Modal */}
-      {showAddressPicker && (
-        <AddressPickerModal
-          initialAddress={address}
-          initialCoordinates={coordinates}
-          onConfirm={setLocation}
-          onClose={() => setShowAddressPicker(false)}
-        />
-      )}
     </div>
   );
 }

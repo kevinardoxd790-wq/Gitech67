@@ -5,10 +5,10 @@ import { useCart } from "@/hooks/useCart";
 import CartDrawer from "@/components/features/CartDrawer";
 import FlashOfferBar from "@/components/features/FlashOfferBar";
 import BrandLogo from "@/components/BrandLogo";
+import { WHATSAPP_NUMBER } from "@/constants/products";
 
 const navLinks = [
   { href: "/catalogo", label: "Catálogo" },
-  { href: "/#combos", label: "Arma tu Combo" },
   { href: "/#agenda", label: "Agendar Envío" },
   { href: "/envios", label: "Envíos Gratis" },
   { href: "/ofertas", label: "🔥 Ofertas" },
@@ -84,7 +84,7 @@ export default function Navbar() {
               </button>
 
               <a
-                href="https://wa.me/50379433144"
+                href={`https://wa.me/${WHATSAPP_NUMBER}`}
                 target="_blank"
                 rel="noopener noreferrer"
                 className="btn-neon text-xs px-4 py-2"
@@ -152,7 +152,7 @@ export default function Navbar() {
               );
             })}
             <a
-              href="https://wa.me/50379433144"
+              href={`https://wa.me/${WHATSAPP_NUMBER}`}
               target="_blank"
               rel="noopener noreferrer"
               className="block px-6 py-4 text-sm font-bold text-neon-cyan uppercase tracking-wider"

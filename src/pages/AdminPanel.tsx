@@ -18,6 +18,8 @@ import {
   ShoppingBag,
   ImagePlus,
   Link2,
+  Plus,
+  X,
 } from "lucide-react";
 import {
   doc,
@@ -97,20 +99,388 @@ async function compressGalleryImage(file: File): Promise<string> {
   }
 }
 
+const PRESET_CATEGORIES = [
+  "Tecnología",
+  "Bluetooth",
+  "Memorias",
+  "Controles",
+  "Accesorios Moto",
+  "Accesorios Auto",
+];
+
+function AddProductCard({
+  onCreate,
+  onCancel,
+}: {
+  onCreate: (data: {
+    name: string;
+    description: string;
+    image: string;
+    price: number;
+    category: string;
+    stock: number;
+    badge: string;
+  }) => Promise<void>;
+  onCancel: () => void;
+}) {
+  const [name, setName] = useState("");
+  const [description, setDescription] = useState("");
+  const [image, setImage] = useState("");
+  const [price, setPrice] = useState("");
+  const [stock, setStock] = useState("10");
+  const [categorySelect, setCategorySelect] = useState("Tecnología");
+  const [customCategory, setCustomCategory] = useState("");
+  const [badge, setBadge] = useState("🆕 NUEVO");
+  const [processingImage, setProcessingImage] = useState(false);
+  const [saving, setSaving] = useState(false);
+  const [showUrlField, setShowUrlField] = useState(false);
+  const [error, setError] = useState("");
+  const fileInputRef = useRef<HTMLInputElement>(null);
+
+  const handleGalleryFileChange = async (
+    e: React.ChangeEvent<HTMLInputElement>
+  ) => {
+    const file = e.target.files?.[0];
+    e.target.value = "";
+    if (!file) return;
+
+    setProcessingImage(true);
+    setError("");
+    try {
+      const compressedDataUrl = await compressGalleryImage(file);
+      setImage(compressedDataUrl);
+      setShowUrlField(false);
+    } catch (err) {
+      setError(
+        err instanceof Error
+          ? err.message
+          : "No se pudo cargar la imagen de galería."
+      );
+    } finally {
+      setProcessingImage(false);
+    }
+  };
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setError("");
+
+    const finalCategory =
+      categorySelect === "__custom__"
+        ? customCategory.trim()
+        : categorySelect.trim();
+    const numericPrice = Number(price);
+    const numericStock = Number(stock);
+
+    if (!name.trim()) {
+      setError("Ingresa el nombre del producto.");
+      return;
+    }
+    if (!finalCategory) {
+      setError("Ingresa la categoría del producto.");
+      return;
+    }
+    if (!image.trim()) {
+      setError("Selecciona una imagen de galería o pega un enlace URL.");
+      return;
+    }
+    if (!description.trim()) {
+      setError("Ingresa la descripción del producto.");
+      return;
+    }
+    if (
+      Number.isNaN(numericPrice) ||
+      numericPrice < 0 ||
+      numericPrice > 10000
+    ) {
+      setError("Ingresa un precio válido entre $0.00 y $10,000.");
+      return;
+    }
+    if (
+      Number.isNaN(numericStock) ||
+      numericStock < 0 ||
+      numericStock > 10000
+    ) {
+      setError("Ingresa un stock válido entre 0 y 10,000.");
+      return;
+    }
+
+    setSaving(true);
+    try {
+      await onCreate({
+        name: name.trim(),
+        description: description.trim(),
+        image: image.trim(),
+        price: numericPrice,
+        category: finalCategory,
+        stock: Math.round(numericStock),
+        badge: badge.trim(),
+      });
+    } catch (err) {
+      setError(
+        err instanceof Error ? err.message : "No se pudo agregar el producto."
+      );
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const isGalleryDataUrl = image.startsWith("data:image/");
+
+  return (
+    <form
+      onSubmit={handleSubmit}
+      className="card-tech p-6 border-2 border-neon-cyan/40 space-y-5"
+    >
+      <div className="flex items-center justify-between gap-4">
+        <div>
+          <h3 className="font-orbitron font-black text-base text-white flex items-center gap-2">
+            <Plus className="w-4 h-4 text-neon-cyan" /> Nuevo Producto
+          </h3>
+          <p className="text-white/45 text-xs mt-0.5">
+            Se publicará automáticamente en la tienda web y en el catálogo
+          </p>
+        </div>
+        <button
+          type="button"
+          onClick={onCancel}
+          className="text-white/40 hover:text-white p-1.5 transition-colors"
+          aria-label="Cerrar formulario"
+        >
+          <X className="w-4 h-4" />
+        </button>
+      </div>
+
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+        <div className="space-y-3">
+          <div>
+            <label className="block text-[11px] font-bold uppercase tracking-wider text-neon-cyan/80 mb-1">
+              Nombre del producto *
+            </label>
+            <input
+              type="text"
+              value={name}
+              onChange={(e) => setName(e.target.value)}
+              placeholder="Ej: Audífonos Bluetooth Pro"
+              maxLength={160}
+              required
+              className="w-full bg-dark-700 border border-neon-cyan/20 rounded-xl px-3 py-2.5 text-sm text-white placeholder-white/25 focus:outline-none focus:border-neon-cyan/50"
+            />
+          </div>
+
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <label className="block text-[11px] font-bold uppercase tracking-wider text-neon-cyan/80 mb-1">
+                Precio (USD) *
+              </label>
+              <input
+                type="number"
+                step="0.01"
+                min="0"
+                max="10000"
+                value={price}
+                onChange={(e) => setPrice(e.target.value)}
+                placeholder="4.99"
+                required
+                className="w-full bg-dark-700 border border-neon-cyan/20 rounded-xl px-3 py-2.5 text-sm text-neon-cyan font-bold placeholder-white/25 focus:outline-none focus:border-neon-cyan/50"
+              />
+            </div>
+
+            <div>
+              <label className="block text-[11px] font-bold uppercase tracking-wider text-neon-cyan/80 mb-1">
+                Stock *
+              </label>
+              <input
+                type="number"
+                step="1"
+                min="0"
+                max="10000"
+                value={stock}
+                onChange={(e) => setStock(e.target.value)}
+                required
+                className="w-full bg-dark-700 border border-neon-cyan/20 rounded-xl px-3 py-2.5 text-sm text-white font-bold focus:outline-none focus:border-neon-cyan/50"
+              />
+            </div>
+          </div>
+
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+            <div>
+              <label className="block text-[11px] font-bold uppercase tracking-wider text-neon-cyan/80 mb-1">
+                Categoría *
+              </label>
+              <select
+                value={categorySelect}
+                onChange={(e) => setCategorySelect(e.target.value)}
+                className="w-full bg-dark-700 border border-neon-cyan/20 rounded-xl px-3 py-2.5 text-sm text-white focus:outline-none focus:border-neon-cyan/50"
+              >
+                {PRESET_CATEGORIES.map((cat) => (
+                  <option key={cat} value={cat} className="bg-dark-800">
+                    {cat}
+                  </option>
+                ))}
+                <option value="__custom__" className="bg-dark-800">
+                  Otra categoría...
+                </option>
+              </select>
+            </div>
+
+            <div>
+              <label className="block text-[11px] font-bold uppercase tracking-wider text-neon-cyan/80 mb-1">
+                Etiqueta (opcional)
+              </label>
+              <input
+                type="text"
+                value={badge}
+                onChange={(e) => setBadge(e.target.value)}
+                placeholder="🆕 NUEVO"
+                maxLength={60}
+                className="w-full bg-dark-700 border border-neon-cyan/20 rounded-xl px-3 py-2.5 text-sm text-white placeholder-white/25 focus:outline-none focus:border-neon-cyan/50"
+              />
+            </div>
+          </div>
+
+          {categorySelect === "__custom__" && (
+            <div>
+              <label className="block text-[11px] font-bold uppercase tracking-wider text-neon-cyan/80 mb-1">
+                Nombre de categoría *
+              </label>
+              <input
+                type="text"
+                value={customCategory}
+                onChange={(e) => setCustomCategory(e.target.value)}
+                placeholder="Ej: Audio, Cargadores..."
+                maxLength={60}
+                required
+                className="w-full bg-dark-700 border border-neon-cyan/20 rounded-xl px-3 py-2 text-sm text-white placeholder-white/25 focus:outline-none focus:border-neon-cyan/50"
+              />
+            </div>
+          )}
+        </div>
+
+        <div className="space-y-3">
+          <div>
+            <label className="block text-[11px] font-bold uppercase tracking-wider text-neon-cyan/80 mb-1">
+              Imagen del producto *
+            </label>
+            <div className="flex items-center gap-3 mb-2">
+              <div className="w-20 h-20 rounded-xl bg-dark-700 border border-neon-cyan/20 flex items-center justify-center overflow-hidden shrink-0">
+                {image ? (
+                  <img
+                    src={image}
+                    alt="Vista previa"
+                    className="w-full h-full object-cover"
+                  />
+                ) : (
+                  <ImagePlus className="w-6 h-6 text-neon-cyan/35" />
+                )}
+              </div>
+              <div className="flex-1 space-y-2">
+                <input
+                  ref={fileInputRef}
+                  type="file"
+                  accept="image/*"
+                  onChange={handleGalleryFileChange}
+                  className="hidden"
+                />
+                <div className="flex gap-2">
+                  <button
+                    type="button"
+                    disabled={processingImage || saving}
+                    onClick={() => fileInputRef.current?.click()}
+                    className="flex-1 flex items-center justify-center gap-2 bg-dark-700 hover:bg-neon-cyan/10 border border-neon-cyan/35 hover:border-neon-cyan text-neon-cyan rounded-xl px-3 py-2.5 text-xs font-bold transition-all disabled:opacity-50"
+                  >
+                    <ImagePlus className="w-4 h-4" />
+                    {processingImage
+                      ? "Procesando..."
+                      : "Seleccionar de galería"}
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setShowUrlField((v) => !v)}
+                    className="flex items-center justify-center px-3 py-2.5 rounded-xl bg-dark-700 border border-white/15 hover:border-neon-cyan/40 text-white/60 hover:text-neon-cyan text-xs transition-all"
+                    title="Pegar enlace URL"
+                  >
+                    <Link2 className="w-3.5 h-3.5" />
+                  </button>
+                </div>
+                {isGalleryDataUrl && (
+                  <p className="text-[11px] text-green-400 font-semibold">
+                    Imagen de galería lista
+                  </p>
+                )}
+              </div>
+            </div>
+            {showUrlField && (
+              <input
+                type="text"
+                value={isGalleryDataUrl ? "" : image}
+                onChange={(e) => setImage(e.target.value)}
+                placeholder="https://... (opcional)"
+                maxLength={2000}
+                className="w-full bg-dark-700 border border-neon-cyan/20 rounded-xl px-3 py-2 text-xs text-white placeholder-white/25 focus:outline-none focus:border-neon-cyan/50"
+              />
+            )}
+          </div>
+
+          <div>
+            <label className="block text-[11px] font-bold uppercase tracking-wider text-neon-cyan/80 mb-1">
+              Descripción *
+            </label>
+            <textarea
+              value={description}
+              onChange={(e) => setDescription(e.target.value)}
+              placeholder="Describe las características principales del producto..."
+              maxLength={1000}
+              rows={3}
+              required
+              className="w-full bg-dark-700 border border-neon-cyan/20 rounded-xl px-3 py-2 text-xs text-white placeholder-white/25 focus:outline-none focus:border-neon-cyan/50 resize-y"
+            />
+          </div>
+        </div>
+      </div>
+
+      {error && <p className="text-red-400 text-xs font-semibold">{error}</p>}
+
+      <div className="flex flex-wrap gap-3 pt-1">
+        <button
+          type="submit"
+          disabled={saving || processingImage}
+          className="btn-neon flex items-center justify-center gap-2 px-6 py-2.5 text-xs disabled:opacity-50"
+        >
+          <Plus className="w-4 h-4" />
+          {saving ? "Publicando..." : "Publicar producto en la web"}
+        </button>
+        <button
+          type="button"
+          disabled={saving}
+          onClick={onCancel}
+          className="btn-neon-outline px-5 py-2.5 text-xs"
+        >
+          Cancelar
+        </button>
+      </div>
+    </form>
+  );
+}
+
 function ProductEditCard({
   product,
   isOverridden,
+  isCustom,
   onSave,
   onReset,
   onDelete,
 }: {
   product: Product;
   isOverridden: boolean;
+  isCustom: boolean;
   onSave: (data: {
     name: string;
     description: string;
     image: string;
     price: number;
+    category: string;
+    stock: number;
   }) => Promise<void>;
   onReset: () => Promise<void>;
   onDelete: () => Promise<void>;
@@ -119,6 +489,8 @@ function ProductEditCard({
   const [description, setDescription] = useState(product.description);
   const [image, setImage] = useState(product.image);
   const [price, setPrice] = useState(product.price.toFixed(2));
+  const [category, setCategory] = useState(product.category);
+  const [stock, setStock] = useState(String(product.stock));
   const [saving, setSaving] = useState(false);
   const [processingImage, setProcessingImage] = useState(false);
   const [confirmDelete, setConfirmDelete] = useState(false);
@@ -131,7 +503,16 @@ function ProductEditCard({
     setDescription(product.description);
     setImage(product.image);
     setPrice(product.price.toFixed(2));
-  }, [product.name, product.description, product.image, product.price]);
+    setCategory(product.category);
+    setStock(String(product.stock));
+  }, [
+    product.name,
+    product.description,
+    product.image,
+    product.price,
+    product.category,
+    product.stock,
+  ]);
 
   const handleGalleryFileChange = async (
     e: React.ChangeEvent<HTMLInputElement>
@@ -168,6 +549,8 @@ function ProductEditCard({
         description,
         image,
         price: Number(price),
+        category: category.trim() || "Tecnología",
+        stock: Math.max(0, Math.min(10000, Math.round(Number(stock) || 0))),
       });
       setStatus("Guardado en base de datos.");
     } catch (err) {
@@ -221,10 +604,16 @@ function ProductEditCard({
             <span className="text-[10px] font-mono text-neon-cyan/70 uppercase truncate">
               {product.id}
             </span>
-            {isOverridden && (
-              <span className="text-[10px] font-bold bg-neon-cyan/15 text-neon-cyan px-2 py-0.5 rounded-full shrink-0">
-                Editado en BD
+            {isCustom ? (
+              <span className="text-[10px] font-bold bg-green-400/15 text-green-400 px-2 py-0.5 rounded-full shrink-0">
+                Nuevo producto
               </span>
+            ) : (
+              isOverridden && (
+                <span className="text-[10px] font-bold bg-neon-cyan/15 text-neon-cyan px-2 py-0.5 rounded-full shrink-0">
+                  Editado en BD
+                </span>
+              )
             )}
           </div>
           <p className="text-white/50 text-xs mt-0.5">{product.category}</p>
@@ -309,19 +698,50 @@ function ProductEditCard({
           />
         </div>
 
+        <div className="grid grid-cols-2 gap-3">
+          <div>
+            <label className="block text-[11px] font-bold uppercase tracking-wider text-neon-cyan/80 mb-1">
+              Precio (USD)
+            </label>
+            <input
+              type="number"
+              step="0.01"
+              min="0"
+              max="10000"
+              value={price}
+              onChange={(e) => setPrice(e.target.value)}
+              required
+              className="w-full bg-dark-700 border border-neon-cyan/20 rounded-xl px-3 py-2 text-sm text-neon-cyan font-bold focus:outline-none focus:border-neon-cyan/50"
+            />
+          </div>
+          <div>
+            <label className="block text-[11px] font-bold uppercase tracking-wider text-neon-cyan/80 mb-1">
+              Stock
+            </label>
+            <input
+              type="number"
+              step="1"
+              min="0"
+              max="10000"
+              value={stock}
+              onChange={(e) => setStock(e.target.value)}
+              required
+              className="w-full bg-dark-700 border border-neon-cyan/20 rounded-xl px-3 py-2 text-sm text-white font-bold focus:outline-none focus:border-neon-cyan/50"
+            />
+          </div>
+        </div>
+
         <div>
           <label className="block text-[11px] font-bold uppercase tracking-wider text-neon-cyan/80 mb-1">
-            Precio (USD)
+            Categoría
           </label>
           <input
-            type="number"
-            step="0.01"
-            min="0"
-            max="10000"
-            value={price}
-            onChange={(e) => setPrice(e.target.value)}
+            type="text"
+            value={category}
+            onChange={(e) => setCategory(e.target.value)}
+            maxLength={60}
             required
-            className="w-full bg-dark-700 border border-neon-cyan/20 rounded-xl px-3 py-2 text-sm text-neon-cyan font-bold focus:outline-none focus:border-neon-cyan/50"
+            className="w-full bg-dark-700 border border-neon-cyan/20 rounded-xl px-3 py-2 text-xs text-white focus:outline-none focus:border-neon-cyan/50"
           />
         </div>
       </div>
@@ -364,7 +784,7 @@ function ProductEditCard({
             <Save className="w-3.5 h-3.5" />
             {saving ? "Guardando..." : "Guardar"}
           </button>
-          {isOverridden && (
+          {isOverridden && !isCustom && (
             <button
               type="button"
               disabled={saving}
@@ -395,6 +815,8 @@ export default function AdminPanel() {
     products,
     deletedProducts,
     productOverrides,
+    customProductIds,
+    createProduct,
     saveProductOverride,
     resetProductOverride,
     deleteProduct,
@@ -420,6 +842,8 @@ export default function AdminPanel() {
   const [activeTab, setActiveTab] = useState<"entregas" | "productos">(
     "entregas"
   );
+  const [showAddProductForm, setShowAddProductForm] = useState(false);
+  const [productNotice, setProductNotice] = useState("");
   const [showDeletedList, setShowDeletedList] = useState(false);
   const [confirmClearAll, setConfirmClearAll] = useState(false);
   const [bookings, setBookings] = useState<Booking[]>([]);
@@ -1015,6 +1439,54 @@ export default function AdminPanel() {
         {/* TAB 2: PRODUCTOS */}
         {activeTab === "productos" && (
           <div className="space-y-6">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 card-tech p-4 border border-neon-cyan/20">
+              <div>
+                <h2 className="font-orbitron font-bold text-sm text-white">
+                  Catálogo Web ({products.length} productos activos)
+                </h2>
+                <p className="text-white/45 text-xs mt-0.5">
+                  Agrega productos nuevos con foto de galería y muéstralos al instante en la web
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={() => {
+                  setShowAddProductForm((v) => !v);
+                  setProductNotice("");
+                }}
+                className="btn-neon flex items-center justify-center gap-2 px-5 py-2.5 text-xs shrink-0"
+              >
+                {showAddProductForm ? (
+                  <>
+                    <X className="w-4 h-4" /> Cerrar formulario
+                  </>
+                ) : (
+                  <>
+                    <Plus className="w-4 h-4" /> Agregar producto
+                  </>
+                )}
+              </button>
+            </div>
+
+            {productNotice && (
+              <div className="p-3.5 rounded-xl bg-green-500/10 border border-green-400/30 text-green-400 text-xs font-semibold">
+                {productNotice}
+              </div>
+            )}
+
+            {showAddProductForm && (
+              <AddProductCard
+                onCreate={async (data) => {
+                  await createProduct(data, adminProof);
+                  setShowAddProductForm(false);
+                  setProductNotice(
+                    `Producto "${data.name}" publicado en la web correctamente.`
+                  );
+                }}
+                onCancel={() => setShowAddProductForm(false)}
+              />
+            )}
+
             {products.length === 0 ? (
               <div className="card-tech p-10 text-center">
                 <ShoppingBag className="w-10 h-10 text-neon-cyan/30 mx-auto mb-3" />
@@ -1029,6 +1501,7 @@ export default function AdminPanel() {
                     key={product.id}
                     product={product}
                     isOverridden={Boolean(productOverrides[product.id])}
+                    isCustom={Boolean(customProductIds[product.id])}
                     onSave={(data) =>
                       saveProductOverride(product.id, data, adminProof)
                     }

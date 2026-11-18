@@ -59,7 +59,7 @@
     },
     "CatalogProductOverride": {
       "title": "CatalogProductOverride",
-      "description": "Admin-editable fields (image, title, description, price, deleted) for a store product.",
+      "description": "Admin-editable fields or newly created store products in catalog_products.",
       "type": "object",
       "properties": {
         "name": {
@@ -83,6 +83,26 @@
         "price": {
           "type": "number",
           "description": "Product price in USD."
+        },
+        "category": {
+          "type": "string",
+          "description": "Optional product category.",
+          "minLength": 1,
+          "maxLength": 60
+        },
+        "stock": {
+          "type": "number",
+          "description": "Optional stock count (0 to 10000)."
+        },
+        "badge": {
+          "type": "string",
+          "description": "Optional short display badge.",
+          "minLength": 0,
+          "maxLength": 60
+        },
+        "isCustom": {
+          "type": "boolean",
+          "description": "True when created directly from KNAS AdminPanel."
         },
         "published": {
           "type": "boolean",

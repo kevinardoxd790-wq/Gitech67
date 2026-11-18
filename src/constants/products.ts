@@ -16,19 +16,21 @@ export function getBluetoothDynamicDiscount(): number {
   return cycle[period % cycle.length];
 }
 
-export const WHATSAPP_NUMBER = "50379433144";
+export const WHATSAPP_NUMBER = "50376299724";
 
 // Shipping logic:
-// Total >= $9 → free in 6 zones + Escalón extra cost
-// Total >= $5 and < $9 → free in 2 zones (Torre Futura, 75 Av Norte) + Escalón extra cost
-// Escalón always extra cost
+// Total > $6.99 → free in all 6 zones (including Salvador del Mundo) + Colonia Escalón ($1.50)
+// Total >= $4.99 and <= $6.99 → free in all zones EXCEPT Salvador del Mundo (5 zones) + Colonia Escalón ($1.50);
+//   if totalItems === 1 → Salvador del Mundo available at $1.50 ("Solo por 1 producto")
+// Total < $4.99 → Colonia Escalón ($1.50); if totalItems === 1 → Salvador del Mundo ($1.50, "Solo por 1 producto")
 export interface ShippingZone {
   name: string;
   cost: number; // 0 = free, > 0 = extra cost
+  note?: string;
 }
 
-export function getShippingZones(total: number): ShippingZone[] {
-  if (total >= 9) {
+export function getShippingZones(total: number, totalItems: number = 0): ShippingZone[] {
+  if (total > 6.99) {
     return [
       { name: "Salvador del Mundo (Gasolinera Texaco)", cost: 0 },
       { name: "Galerías Escalón", cost: 0 },
@@ -39,22 +41,50 @@ export function getShippingZones(total: number): ShippingZone[] {
       { name: "Colonia Escalón", cost: 1.5 },
     ];
   }
-  if (total >= 5) {
-    return [
+
+  if (total >= 4.99) {
+    const zones: ShippingZone[] = [
+      { name: "Galerías Escalón", cost: 0 },
       { name: "Torre Futura", cost: 0 },
       { name: "75 Av. Norte (Gasolinera)", cost: 0 },
-      { name: "Colonia Escalón", cost: 1.5 },
+      { name: "Redondel Masferrer", cost: 0 },
+      { name: "Redondel Luceiro", cost: 0 },
     ];
+    if (totalItems === 1) {
+      zones.push({
+        name: "Salvador del Mundo (Gasolinera Texaco)",
+        cost: 1.5,
+        note: "Solo por 1 producto",
+      });
+    }
+    zones.push({ name: "Colonia Escalón", cost: 1.5 });
+    return zones;
   }
-  return [
-    { name: "Colonia Escalón", cost: 1.5 },
-  ];
+
+  const fallbackZones: ShippingZone[] = [];
+  if (totalItems === 1) {
+    fallbackZones.push({
+      name: "Salvador del Mundo (Gasolinera Texaco)",
+      cost: 1.5,
+      note: "Solo por 1 producto",
+    });
+  }
+  fallbackZones.push({ name: "Colonia Escalón", cost: 1.5 });
+  return fallbackZones;
 }
 
-export function getShippingLabel(total: number): string {
-  if (total >= 9) return "¡Envío gratis en 6 zonas!";
-  if (total >= 5) return "Envío gratis en Torre Futura y 75 Av. Norte";
-  return "Solo entrega en Colonia Escalón (costo adicional)";
+export function getShippingLabel(total: number, totalItems: number = 0): string {
+  if (total > 6.99) {
+    return "¡Envío gratis en todas las zonas (incluye Salvador del Mundo)!";
+  }
+  if (total >= 4.99) {
+    return totalItems === 1
+      ? "¡Envío gratis en todas las zonas excepto Salvador del Mundo ($1.50 solo por 1 producto)!"
+      : "¡Envío gratis en todas las zonas excepto Salvador del Mundo!";
+  }
+  return totalItems === 1
+    ? "Salvador del Mundo ($1.50 solo por 1 producto) y Colonia Escalón ($1.50)"
+    : "Solo entrega en Colonia Escalón ($1.50) · Gratis desde $4.99";
 }
 
 export const PRODUCTS: Product[] = [

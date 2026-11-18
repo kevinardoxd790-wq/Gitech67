@@ -70,7 +70,7 @@ export default function ProductCard({ product }: ProductCardProps) {
 
         <div className="flex items-center gap-1 text-xs text-white/50 mb-4">
           <CheckCircle className="w-3 h-3 text-neon-cyan shrink-0" />
-          <span>{product.features[0]}</span>
+          <span className="line-clamp-1">{product.features[0] || product.description}</span>
         </div>
 
         {/* Fixed Price */}
@@ -80,7 +80,13 @@ export default function ProductCard({ product }: ProductCardProps) {
               ${fixedPrice.toFixed(2)}
             </span>
           </div>
-          <p className="text-[10px] text-green-400 font-semibold mb-3">🚚 ENVÍO GRATIS disponible</p>
+          <p className="text-[10px] text-green-400 font-semibold mb-3 leading-snug">
+            {fixedPrice > 6.99
+              ? "🚚 Envío gratis en todas las zonas (+ Salvador del Mundo)"
+              : fixedPrice >= 4.99
+                ? "🚚 Envío gratis (todas menos Salvador del Mundo)"
+                : "⛽ $1.50 Salvador del Mundo (1 prod.) · Gratis desde $4.99"}
+          </p>
 
           {/* Add to cart */}
           <button

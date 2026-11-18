@@ -65,7 +65,7 @@ service cloud.firestore {
 
     function isValidCatalogProduct(data) {
       return data.keys().hasAll(['name', 'description', 'image', 'price', 'published', 'updatedAt']) &&
-        data.keys().hasOnly(['name', 'description', 'image', 'price', 'published', 'deleted', 'updatedAt']) &&
+        data.keys().hasOnly(['name', 'description', 'image', 'price', 'category', 'stock', 'badge', 'isCustom', 'published', 'deleted', 'updatedAt']) &&
         data.name is string &&
         data.name.size() >= 1 &&
         data.name.size() <= 160 &&
@@ -76,6 +76,10 @@ service cloud.firestore {
         data.price is number &&
         data.price >= 0 &&
         data.price <= 10000 &&
+        (!('category' in data) || (data.category is string && data.category.size() >= 1 && data.category.size() <= 60)) &&
+        (!('stock' in data) || (data.stock is number && data.stock >= 0 && data.stock <= 10000)) &&
+        (!('badge' in data) || (data.badge is string && data.badge.size() <= 60)) &&
+        (!('isCustom' in data) || data.isCustom is bool) &&
         data.published is bool &&
         data.published == true &&
         (!('deleted' in data) || data.deleted is bool) &&
@@ -155,7 +159,7 @@ service cloud.firestore {
         isVerifiedPasswordBatch();
       allow update: if isValidId(productId) &&
         isValidCatalogProduct(incoming()) &&
-        incoming().diff(existing()).affectedKeys().hasOnly(['name', 'description', 'image', 'price', 'published', 'deleted', 'updatedAt']) &&
+        incoming().diff(existing()).affectedKeys().hasOnly(['name', 'description', 'image', 'price', 'category', 'stock', 'badge', 'isCustom', 'published', 'deleted', 'updatedAt']) &&
         isVerifiedPasswordBatch();
       allow delete: if isValidId(productId) && isVerifiedPasswordBatch();
     }

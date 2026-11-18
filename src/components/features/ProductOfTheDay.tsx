@@ -14,12 +14,14 @@ function formatDate() {
 
 export default function ProductOfTheDay() {
   const { products: PRODUCTS } = useCatalog();
+  const { addToCart, items } = useCart();
+  if (PRODUCTS.length === 0) return null;
+
   const now = new Date();
   const start = new Date(now.getFullYear(), 0, 0);
   const diff = now.getTime() - start.getTime();
   const dayOfYear = Math.floor(diff / (1000 * 60 * 60 * 24));
   const product = PRODUCTS[dayOfYear % PRODUCTS.length];
-  const { addToCart, items } = useCart();
   const inCart = items.find((i) => i.product.id === product.id);
   const fixedPrice = Number(product.price);
 

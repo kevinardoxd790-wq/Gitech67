@@ -2,23 +2,11 @@ import { Link } from "react-router-dom";
 import { Zap, Truck, Tag, ChevronRight, Star } from "lucide-react";
 import { useCatalog } from "@/hooks/useCatalog";
 import ProductCard from "@/components/features/ProductCard";
-
-const FREE_SHIPPING_PRODUCT_IDS = [
-  "bluetooth-5-0",
-  "microsd-128gb",
-  "microsd-64gb",
-  "candado-moto",
-  "control-remoto-universal",
-  "control-tcl",
-  "soporte-moto",
-  "soporte-retrovisor",
-];
+import { WHATSAPP_NUMBER } from "@/constants/products";
 
 export default function Offers() {
   const { products: PRODUCTS } = useCatalog();
-  const freeShippingProducts = PRODUCTS.filter((p) =>
-    FREE_SHIPPING_PRODUCT_IDS.includes(p.id)
-  );
+  const freeShippingProducts = PRODUCTS;
   const bluetoothProduct =
     PRODUCTS.find((p) => p.id === "bluetooth-5-0") ?? PRODUCTS[0];
 
@@ -102,7 +90,7 @@ export default function Offers() {
                       Comprar ahora
                     </Link>
                     <a
-                      href={`https://wa.me/50379433144?text=${encodeURIComponent(
+                      href={`https://wa.me/${WHATSAPP_NUMBER}?text=${encodeURIComponent(
                         `Hola GoTech! Quiero el ${bluetoothProduct.name} — $${Number(bluetoothProduct.price).toFixed(2)}`
                       )}`}
                       target="_blank"
@@ -140,10 +128,10 @@ export default function Offers() {
             </div>
             <div>
               <p className="font-orbitron font-black text-white text-lg">
-                🚚 ENVÍOS GRATIS DISPONIBLES
+                🚚 ENVÍOS GRATIS DESDE $4.99
               </p>
               <p className="text-white/50 text-sm">
-                Según el total de tu compra puedes aplicar a envío gratis en zonas seleccionadas
+                Desde $4.99 todas las zonas menos Salvador del Mundo · Más de $6.99 incluye Salvador del Mundo
               </p>
             </div>
             <Link to="/envios" className="btn-neon-outline shrink-0 text-xs flex items-center gap-1 px-4 py-2.5">

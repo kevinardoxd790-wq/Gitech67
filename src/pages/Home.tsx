@@ -5,10 +5,10 @@ import { useCatalog } from "@/hooks/useCatalog";
 import ProductCard from "@/components/features/ProductCard";
 import ReviewsSection from "@/components/features/ReviewsSection";
 import ProductOfTheDay from "@/components/features/ProductOfTheDay";
-import BundlesSection from "@/components/features/BundlesSection";
 import DeliveryScheduler from "@/components/features/DeliveryScheduler";
 import AiHelpBanner from "@/components/features/AiHelpBanner";
 import BrandLogo from "@/components/BrandLogo";
+import { WHATSAPP_NUMBER } from "@/constants/products";
 
 export default function Home() {
   const { products: PRODUCTS } = useCatalog();
@@ -66,7 +66,7 @@ export default function Home() {
                   Ver Productos
                 </Link>
                 <a
-                  href="https://wa.me/50379433144"
+                  href={`https://wa.me/${WHATSAPP_NUMBER}`}
                   target="_blank"
                   rel="noopener noreferrer"
                   className="btn-neon-outline flex items-center gap-2 text-base px-8 py-4"
@@ -180,14 +180,24 @@ export default function Home() {
 
           {/* Category quick-filters */}
           <div className="flex flex-wrap gap-2 mb-8">
-            {["Todos", "Bluetooth", "Memorias", "Controles", "Accesorios Moto", "Accesorios Auto"].map((cat) => (
-              <a
+            {Array.from(
+              new Set([
+                "Todos",
+                "Bluetooth",
+                "Memorias",
+                "Controles",
+                "Accesorios Moto",
+                "Accesorios Auto",
+                ...PRODUCTS.map((p) => p.category).filter(Boolean),
+              ])
+            ).map((cat) => (
+              <Link
                 key={cat}
-                href={`/catalogo`}
+                to="/catalogo"
                 className="px-3 py-1.5 rounded-xl text-xs font-bold uppercase tracking-wider bg-dark-700 border border-neon-cyan/20 text-white/50 hover:border-neon-cyan/50 hover:text-neon-cyan transition-all"
               >
                 {cat}
-              </a>
+              </Link>
             ))}
           </div>
 
@@ -250,11 +260,6 @@ export default function Home() {
 
       <div className="neon-divider" />
 
-      {/* ── BUNDLES ── */}
-      <BundlesSection />
-
-      <div className="neon-divider" />
-
       {/* ── DELIVERY SCHEDULER ── */}
       <DeliveryScheduler />
 
@@ -275,7 +280,7 @@ export default function Home() {
                 Entregamos en San Salvador
               </h2>
               <p className="text-white/60 text-base leading-relaxed max-w-md">
-                Zonas seleccionadas con envío gratis. Torre Futura, Galerías Escalón, Salvador del Mundo y más.
+                Desde $4.99 gratis en todas las zonas excepto Salvador del Mundo. Más de $6.99 incluye Salvador del Mundo ($1.50 solo si es 1 producto).
               </p>
             </div>
             <Link to="/envios" className="btn-neon-outline shrink-0 flex items-center gap-2">
@@ -296,7 +301,7 @@ export default function Home() {
               <Link to="/ofertas" className="hover:text-neon-cyan transition-colors">🔥 Ofertas</Link>
               <Link to="/catalogo" className="hover:text-neon-cyan transition-colors">Catálogo</Link>
               <Link to="/envios" className="hover:text-neon-cyan transition-colors">Envíos</Link>
-              <a href="https://wa.me/50379433144" target="_blank" rel="noopener noreferrer" className="hover:text-neon-cyan transition-colors">
+              <a href={`https://wa.me/${WHATSAPP_NUMBER}`} target="_blank" rel="noopener noreferrer" className="hover:text-neon-cyan transition-colors">
                 WhatsApp
               </a>
             </div>

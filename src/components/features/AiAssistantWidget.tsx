@@ -71,13 +71,29 @@ function generarRespuestaRespaldoLocal(
       };
     }
 
-    // Detecta intención de abrir carrito
-    if (
-      q.includes("carrito") ||
-      q.includes("pagar") ||
-      q.includes("pedido") ||
-      q.includes("resumen")
-    ) {
+    const normalizeText = (s: string) =>
+      s
+        .toLowerCase()
+        .normalize("NFD")
+        .replace(/[\u0300-\u036f]/g, "")
+        .replace(/[^a-z0-9\s]/g, " ");
+
+    const normalizedQuery = normalizeText(q);
+    const wantsAdd =
+      /\b(agrega|agregar|anade|anadir|pon|ponme|poner|quiero|comprar|llevo|llevar|dame|manda|necesito)\b/.test(
+        normalizedQuery
+      );
+
+    // Detecta intención explícita de abrir carrito (solo si NO está pidiendo agregar un producto)
+    const wantsOpenCart =
+      !wantsAdd &&
+      (/\b(abre|abrir|ver|mostrar|muestra|revisar|ir)\b/.test(normalizedQuery) &&
+        (normalizedQuery.includes("carrito") || normalizedQuery.includes("pedido")) ||
+        normalizedQuery.trim() === "carrito" ||
+        normalizedQuery.includes("pagar") ||
+        normalizedQuery.includes("resumen"));
+
+    if (wantsOpenCart) {
       acciones.push({ tipo: "abrir_carrito" });
       return {
         respuesta:
@@ -87,34 +103,113 @@ function generarRespuestaRespaldoLocal(
     }
 
     // Consultas de envío
-    if (q.includes("envio") || q.includes("envío") || q.includes("zona")) {
+    if (
+      !wantsAdd &&
+      (q.includes("envio") || q.includes("envío") || q.includes("zona"))
+    ) {
       return {
         respuesta:
-          "En compras desde $9.00 tienes envío gratis en 6 zonas (Salvador del Mundo, Galerías Escalón, Torre Futura, 75 Av. Norte, Masferrer y Luceiro). Desde $5.00 es gratis en Torre Futura y 75 Av. Norte; Colonia Escalón tiene costo fijo de $1.50.",
+          "Desde $4.99 tienes envío gratis en todas las zonas menos Salvador del Mundo (Galerías Escalón, Torre Futura, 75 Av. Norte, Masferrer y Luceiro). En compras mayores a $6.99 incluye gratis también Salvador del Mundo. Si llevas solo 1 producto, te lo llevamos a Salvador del Mundo por $1.50 (Colonia Escalón siempre $1.50).",
         acciones: [],
       };
     }
 
-    // Busca producto coincidente en el catálogo real
-    const matched = products.find(
-      (p) =>
-        p.name.toLowerCase().includes(q) ||
-        p.shortName.toLowerCase().includes(q) ||
-        p.category.toLowerCase().includes(q) ||
-        q
-          .split(/\s+/)
-          .some((w) => w.length >= 4 && p.name.toLowerCase().includes(w))
-    );
+    // Busca el producto con mayor coincidencia exacta en el catálogo real (sin agregar otros artículos)
+    const stopWords = new Set([
+      "para",
+      "de",
+      "del",
+      "un",
+      "una",
+      "unos",
+      "unas",
+      "el",
+      "la",
+      "los",
+      "las",
+      "con",
+      "por",
+      "en",
+      "mi",
+      "tu",
+      "su",
+      "al",
+      "carrito",
+      "agrega",
+      "agregar",
+      "anade",
+      "anadir",
+      "pon",
+      "ponme",
+      "poner",
+      "quiero",
+      "comprar",
+      "llevar",
+      "llevo",
+      "dame",
+      "necesito",
+      "manda",
+      "favor",
+      "producto",
+      "productos",
+      "cuesta",
+      "precio",
+      "vale",
+      "tienen",
+      "hay",
+    ]);
+
+    const queryTokens = normalizedQuery
+      .split(/\s+/)
+      .filter((w) => w.length >= 2 && !stopWords.has(w));
+
+    let matched: Product | undefined;
+    let bestScore = 0;
+
+    for (const p of products) {
+      const nName = normalizeText(p.name);
+      const nShort = normalizeText(p.shortName);
+      const nCat = normalizeText(p.category);
+      const nDesc = normalizeText(p.description);
+      let score = 0;
+
+      if (nName.includes(normalizedQuery) || nShort.includes(normalizedQuery)) {
+        score += 100;
+      }
+
+      let matchedTokenCount = 0;
+      for (const tok of queryTokens) {
+        let tokHit = false;
+        if (nName.includes(tok)) {
+          score += 12;
+          tokHit = true;
+        }
+        if (nShort.includes(tok)) {
+          score += 8;
+          tokHit = true;
+        }
+        if (nCat.includes(tok)) {
+          score += 5;
+          tokHit = true;
+        }
+        if (nDesc.includes(tok)) {
+          score += 2;
+          tokHit = true;
+        }
+        if (tokHit) matchedTokenCount += 1;
+      }
+
+      if (queryTokens.length > 0) {
+        score += Math.round((matchedTokenCount / queryTokens.length) * 30);
+      }
+
+      if (score > bestScore && matchedTokenCount > 0) {
+        bestScore = score;
+        matched = p;
+      }
+    }
 
     if (matched) {
-      const wantsAdd =
-        q.includes("agrega") ||
-        q.includes("añade") ||
-        q.includes("pon") ||
-        q.includes("quiero") ||
-        q.includes("comprar") ||
-        q.includes("llevo");
-
       if (wantsAdd && matched.stock > 0) {
         const qtyMatch = q.match(/\b(\d+)\b/);
         const cantidad = qtyMatch
@@ -145,8 +240,6 @@ function generarRespuestaRespaldoLocal(
       q.includes("catálogo") ||
       q.includes("precio") ||
       q.includes("stock") ||
-      q.includes("combo") ||
-      q.includes("pack") ||
       q.includes("ayuda") ||
       q.includes("disponible") ||
       q.includes("tienen");
@@ -191,7 +284,7 @@ function summarizeExecutedActions(data: AIRespuestaJSON): string | undefined {
 }
 
 export default function AiAssistantWidget() {
-  const { products, bundles } = useCatalog();
+  const { products } = useCatalog();
   const { addToCart, openCart } = useCart();
 
   const [isOpen, setIsOpen] = useState(false);
@@ -287,7 +380,7 @@ export default function AiAssistantWidget() {
     }
 
     const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), 9000);
+    const timeoutId = setTimeout(() => controller.abort(), 22000);
 
     try {
       const catalogPayload = products.map((p, idx) => ({
@@ -300,13 +393,6 @@ export default function AiAssistantWidget() {
         description: p.description,
       }));
 
-      const bundlesPayload = bundles.map((b) => ({
-        id: b.id,
-        name: b.name,
-        tagline: b.tagline,
-        bundlePrice: b.bundlePrice,
-      }));
-
       const response = await fetch("/api/ai/chat", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -314,7 +400,6 @@ export default function AiAssistantWidget() {
         body: JSON.stringify({
           message: trimmed,
           catalog: catalogPayload,
-          bundles: bundlesPayload,
           history: historyPayload,
         }),
       });
