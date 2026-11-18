@@ -757,15 +757,27 @@ export default function AiAssistantWidget() {
         <button
           type="button"
           onClick={() => setIsOpen(true)}
-          className={`rounded-full px-4 py-3 flex items-center gap-2 text-xs font-bold transition-all duration-300 ${
+          className={`relative overflow-hidden rounded-full px-4 py-3 flex items-center gap-2 text-xs font-bold text-white transition-all duration-700 ease-in-out hover:brightness-110 active:scale-95 ${
             isPerfumeTheme
-              ? "bg-gradient-to-r from-[#5B0A1E] to-[#8B1A35] text-[#FFF8F6] border border-[#E5B8A8]/50 shadow-[0_10px_28px_rgba(91,10,30,0.35)] hover:brightness-110"
-              : "btn-gotech rounded-full px-4 py-3 shadow-[0_10px_28px_rgba(0,87,255,0.35)]"
+              ? "border border-[#E5B8A8]/50 shadow-[0_10px_28px_rgba(91,10,30,0.35)]"
+              : "border border-white/20 shadow-[0_10px_28px_rgba(0,87,255,0.35)]"
           }`}
           aria-label="Abrir asistente de compras"
         >
-          <Bot className="w-4 h-4" />
-          <span className="hidden sm:inline">
+          <span
+            aria-hidden="true"
+            className={`absolute inset-0 bg-gradient-to-r from-[#00349A] via-[#0057FF] to-[#0095FF] transition-opacity duration-700 ease-in-out ${
+              isPerfumeTheme ? "opacity-0" : "opacity-100"
+            }`}
+          />
+          <span
+            aria-hidden="true"
+            className={`absolute inset-0 bg-gradient-to-r from-[#5B0A1E] to-[#8B1A35] transition-opacity duration-700 ease-in-out ${
+              isPerfumeTheme ? "opacity-100" : "opacity-0"
+            }`}
+          />
+          <Bot className="relative z-10 w-4 h-4" />
+          <span className="relative z-10 hidden sm:inline">
             {isPerfumeTheme ? "Asistente Boutique" : "Asistente IA"}
           </span>
         </button>

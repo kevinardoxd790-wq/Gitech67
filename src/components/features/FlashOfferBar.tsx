@@ -9,7 +9,7 @@ function formatTwoDigits(n: number): string {
 
 /**
  * Barra superior no invasiva de Oferta Flash con temporizador digital en bucle (HH:MM:SS),
- * adaptada a GoTech (azul eléctrico), Perfumes (borgoña boutique) o KNAS admin.
+ * con transición suave por opacidad entre GoTech (azul eléctrico), Perfumes (borgoña) y KNAS admin.
  */
 export default function FlashOfferBar({
   isPerfumeTheme = false,
@@ -44,17 +44,37 @@ export default function FlashOfferBar({
 
   return (
     <div
-      className={`w-full h-7 flex items-center justify-center px-3 text-[11px] font-semibold overflow-hidden transition-colors ${
+      className={`relative w-full h-7 flex items-center justify-center px-3 text-[11px] font-semibold overflow-hidden border-b transition-colors duration-700 ease-in-out ${
         isAdminTheme
-          ? "bg-gradient-to-r from-dark-900 via-neon-blue/25 to-dark-900 border-b border-neon-cyan/30 text-white"
+          ? "border-neon-cyan/30 text-white"
           : isPerfumeTheme
-            ? "bg-gradient-to-r from-[#4D0819] via-[#6D1128] to-[#4D0819] border-b border-[#D8B474]/40 text-[#FFF7F4]"
-            : "bg-gradient-to-r from-[#00349A] via-[#0057FF] to-[#0077FF] border-b border-[#0044CC] text-white"
+            ? "border-[#D8B474]/40 text-[#FFF7F4]"
+            : "border-[#0044CC] text-white"
       }`}
     >
-      <div className="flex items-center gap-2 whitespace-nowrap">
+      {/* Cross-fading gradient backdrops for smooth section transition */}
+      <div
+        aria-hidden="true"
+        className={`absolute inset-0 bg-gradient-to-r from-[#00349A] via-[#0057FF] to-[#0077FF] transition-opacity duration-700 ease-in-out ${
+          !isAdminTheme && !isPerfumeTheme ? "opacity-100" : "opacity-0"
+        }`}
+      />
+      <div
+        aria-hidden="true"
+        className={`absolute inset-0 bg-gradient-to-r from-[#4D0819] via-[#6D1128] to-[#4D0819] transition-opacity duration-700 ease-in-out ${
+          !isAdminTheme && isPerfumeTheme ? "opacity-100" : "opacity-0"
+        }`}
+      />
+      <div
+        aria-hidden="true"
+        className={`absolute inset-0 bg-gradient-to-r from-dark-900 via-neon-blue/25 to-dark-900 transition-opacity duration-700 ease-in-out ${
+          isAdminTheme ? "opacity-100" : "opacity-0"
+        }`}
+      />
+
+      <div className="relative z-10 flex items-center gap-2 whitespace-nowrap">
         <Zap
-          className={`w-3.5 h-3.5 shrink-0 animate-pulse ${
+          className={`w-3.5 h-3.5 shrink-0 animate-pulse transition-colors duration-700 ease-in-out ${
             isAdminTheme
               ? "text-neon-cyan"
               : isPerfumeTheme
@@ -63,7 +83,7 @@ export default function FlashOfferBar({
           }`}
         />
         <span
-          className={`truncate ${
+          className={`truncate transition-colors duration-700 ease-in-out ${
             isAdminTheme
               ? "text-white/90"
               : isPerfumeTheme
@@ -76,7 +96,7 @@ export default function FlashOfferBar({
             : "OFERTA FLASH · Stock disponible para entrega hoy en San Salvador"}
         </span>
         <span
-          className={`rounded px-2 py-0.5 text-[10px] tracking-wider shrink-0 ${
+          className={`rounded px-2 py-0.5 text-[10px] tracking-wider shrink-0 transition-all duration-700 ease-in-out ${
             isAdminTheme
               ? "font-orbitron font-black text-neon-cyan bg-dark-800/90 border border-neon-cyan/40"
               : isPerfumeTheme

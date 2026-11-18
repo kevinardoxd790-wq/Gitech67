@@ -8,8 +8,8 @@ interface BrandLogoProps {
 }
 
 /**
- * GoTech G-orbit vector mark matching the GoTech identity across both
- * light crisp headers and dark footer / admin banners.
+ * Unified GoTech G-orbit vector logo used consistently across
+ * the GoTech storefront, Perfumes section, footer, and admin navbar.
  */
 function GoTechVectorMark({
   tone = "light",
@@ -20,7 +20,7 @@ function GoTechVectorMark({
 }) {
   return (
     <div
-      className={`inline-flex items-center gap-2.5 select-none ${className}`}
+      className={`inline-flex items-center gap-2.5 select-none transition-all duration-700 ease-in-out ${className}`}
     >
       <svg
         viewBox="0 0 88 68"
@@ -61,14 +61,18 @@ function GoTechVectorMark({
 
       <span
         aria-hidden="true"
-        className={`h-6 w-px ${
+        className={`h-6 w-px transition-colors duration-700 ease-in-out ${
           tone === "light" ? "bg-[#C7D7F2]" : "bg-white/25"
         }`}
       />
 
       <span className="font-montserrat font-black italic tracking-tight text-xl sm:text-2xl leading-none">
         <span className="text-[#0066FF]">Go</span>
-        <span className={tone === "light" ? "text-[#0B172A]" : "text-white"}>
+        <span
+          className={`transition-colors duration-700 ease-in-out ${
+            tone === "light" ? "text-[#0B172A]" : "text-white"
+          }`}
+        >
           Tech
         </span>
       </span>
@@ -96,19 +100,5 @@ export default function BrandLogo({
     );
   }
 
-  if (tone === "light") {
-    return <GoTechVectorMark tone="light" className={className} />;
-  }
-
-  return (
-    <div
-      className={`relative w-[172px] h-[46px] overflow-hidden flex items-center justify-center select-none ${className}`}
-    >
-      <img
-        src={GOTECH_LOGO_SRC}
-        alt="GoTech SV"
-        className="w-full h-full object-cover object-center brand-logo-mask-compact"
-      />
-    </div>
-  );
+  return <GoTechVectorMark tone={tone} className={className} />;
 }

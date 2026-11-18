@@ -31,28 +31,24 @@ export default function Navbar() {
           isAdminTheme={isAdminTheme}
         />
         <nav
-          className={`backdrop-blur-md border-b transition-colors duration-300 ${
+          className={`backdrop-blur-md border-b transition-all duration-700 ease-in-out ${
             isAdminTheme
               ? "bg-dark-900/95 border-neon-cyan/20"
               : isPerfumeTheme
-                ? "bg-[#FAF0EC]/95 border-[#E2C8BF]"
+                ? "bg-[#FAF0EC]/95 border-[#E2C8BF] shadow-[0_4px_20px_rgba(77,8,25,0.06)]"
                 : "bg-white/95 border-[#DCE7F8] shadow-[0_4px_20px_rgba(0,68,180,0.06)]"
           }`}
         >
           <div className="max-w-6xl mx-auto px-4 h-16 flex items-center justify-between">
-            {/* Logo */}
+            {/* Logo: Same consistent GoTech logo across GoTech & Perfumes */}
             <Link
               to="/"
-              className={`flex items-center group transition-transform duration-300 hover:scale-[1.03] ${
-                isPerfumeTheme
-                  ? "bg-[#060D1D] rounded-xl px-2 py-0.5 border border-[#DFC5BC]"
-                  : ""
-              }`}
+              className="flex items-center group transition-transform duration-500 ease-out hover:scale-[1.03]"
               aria-label="GoTech Inicio"
             >
               <BrandLogo
                 variant="compact"
-                tone={isAdminTheme || isPerfumeTheme ? "dark" : "light"}
+                tone={isAdminTheme ? "dark" : "light"}
               />
             </Link>
 
@@ -66,7 +62,7 @@ export default function Navbar() {
                     <a
                       key={link.href}
                       href={link.href}
-                      className={`text-sm font-semibold uppercase tracking-wider transition-all duration-200 ${
+                      className={`text-sm font-semibold uppercase tracking-wider transition-colors duration-500 ease-in-out ${
                         isAdminTheme
                           ? "text-white/70 hover:text-neon-cyan"
                           : isPerfumeTheme
@@ -82,7 +78,7 @@ export default function Navbar() {
                   <Link
                     key={link.href}
                     to={link.href}
-                    className={`text-sm font-semibold uppercase tracking-wider transition-all duration-200 ${
+                    className={`text-sm font-semibold uppercase tracking-wider transition-colors duration-500 ease-in-out ${
                       isAdminTheme
                         ? isActive
                           ? "text-neon-cyan glow-text"
@@ -104,7 +100,7 @@ export default function Navbar() {
               {/* Cart button */}
               <button
                 onClick={openCart}
-                className={`relative flex items-center gap-2 rounded-xl px-4 py-2 transition-all duration-300 group ${
+                className={`relative flex items-center gap-2 rounded-xl px-4 py-2 transition-all duration-500 ease-in-out group ${
                   isAdminTheme
                     ? `bg-dark-700 border border-neon-cyan/20 hover:border-neon-cyan/60 hover:shadow-neon-sm ${
                         cartBounce ? "scale-110 border-neon-cyan shadow-neon" : ""
@@ -120,7 +116,7 @@ export default function Navbar() {
                 aria-label="Carrito"
               >
                 <ShoppingCart
-                  className={`w-4 h-4 transition-transform duration-300 ${
+                  className={`w-4 h-4 transition-all duration-500 ease-in-out ${
                     isAdminTheme
                       ? "text-neon-cyan"
                       : isPerfumeTheme
@@ -129,7 +125,7 @@ export default function Navbar() {
                   } ${cartBounce ? "animate-bounce scale-125" : ""}`}
                 />
                 <span
-                  className={`text-sm font-semibold ${
+                  className={`text-sm font-semibold transition-colors duration-500 ease-in-out ${
                     isAdminTheme
                       ? "text-white/70 group-hover:text-white"
                       : isPerfumeTheme
@@ -141,7 +137,7 @@ export default function Navbar() {
                 </span>
                 {totalItems > 0 && (
                   <span
-                    className={`absolute -top-2 -right-2 font-black text-[10px] w-5 h-5 rounded-full flex items-center justify-center ${
+                    className={`absolute -top-2 -right-2 font-black text-[10px] w-5 h-5 rounded-full flex items-center justify-center transition-colors duration-500 ease-in-out ${
                       isAdminTheme
                         ? "bg-neon-cyan text-dark-900 animate-pulse-neon"
                         : isPerfumeTheme
@@ -160,10 +156,10 @@ export default function Navbar() {
                 rel="noopener noreferrer"
                 className={
                   isAdminTheme
-                    ? "btn-neon text-xs px-4 py-2"
+                    ? "btn-neon text-xs px-4 py-2 transition-all duration-500"
                     : isPerfumeTheme
-                      ? "bg-[#5B0A1E] hover:bg-[#7A102B] text-[#FFF8F6] font-bold uppercase tracking-wider text-xs px-4 py-2.5 rounded-xl transition-colors"
-                      : "btn-gotech text-xs px-5 py-2.5 uppercase tracking-wider"
+                      ? "bg-[#5B0A1E] hover:bg-[#7A102B] text-[#FFF8F6] font-bold uppercase tracking-wider text-xs px-5 py-2.5 rounded-full transition-all duration-500 ease-in-out shadow-sm"
+                      : "btn-gotech text-xs px-5 py-2.5 uppercase tracking-wider transition-all duration-500 ease-in-out"
                 }
               >
                 WhatsApp
@@ -174,7 +170,7 @@ export default function Navbar() {
             <div className="md:hidden flex items-center gap-3">
               <button
                 onClick={openCart}
-                className={`relative p-2 transition-transform duration-300 ${
+                className={`relative p-2 transition-all duration-500 ease-in-out ${
                   isAdminTheme
                     ? "text-neon-cyan"
                     : isPerfumeTheme
@@ -188,7 +184,7 @@ export default function Navbar() {
                 />
                 {totalItems > 0 && (
                   <span
-                    className={`absolute -top-0.5 -right-0.5 font-black text-[9px] w-4 h-4 rounded-full flex items-center justify-center ${
+                    className={`absolute -top-0.5 -right-0.5 font-black text-[9px] w-4 h-4 rounded-full flex items-center justify-center transition-colors duration-500 ease-in-out ${
                       isAdminTheme
                         ? "bg-neon-cyan text-dark-900"
                         : isPerfumeTheme
@@ -202,7 +198,7 @@ export default function Navbar() {
               </button>
               <button
                 onClick={() => setOpen(!open)}
-                className={`p-2 ${
+                className={`p-2 transition-colors duration-500 ease-in-out ${
                   isAdminTheme
                     ? "text-neon-cyan"
                     : isPerfumeTheme
@@ -219,7 +215,7 @@ export default function Navbar() {
           {/* Mobile Menu */}
           {open && (
             <div
-              className={`md:hidden border-t animate-fade-in ${
+              className={`md:hidden border-t animate-fade-in transition-colors duration-500 ease-in-out ${
                 isAdminTheme
                   ? "bg-dark-800 border-neon-cyan/20"
                   : isPerfumeTheme

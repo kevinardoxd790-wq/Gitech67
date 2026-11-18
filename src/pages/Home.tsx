@@ -14,7 +14,6 @@ import {
 } from "lucide-react";
 import { useCatalog } from "@/hooks/useCatalog";
 import ProductCard from "@/components/features/ProductCard";
-import ReviewsSection from "@/components/features/ReviewsSection";
 import ProductOfTheDay from "@/components/features/ProductOfTheDay";
 import DeliveryScheduler from "@/components/features/DeliveryScheduler";
 import AiHelpBanner from "@/components/features/AiHelpBanner";
@@ -359,11 +358,6 @@ export default function Home() {
 
       {/* ── DELIVERY SCHEDULER ── */}
       <DeliveryScheduler />
-
-      <div className="gotech-divider" />
-
-      {/* ── REVIEWS ── */}
-      <ReviewsSection />
 
       {/* ── TRUST STRIP & DELIVERY PREVIEW (MATCHING REFERENCE IMAGE) ── */}
       <section className="relative py-14 overflow-hidden bg-gotech-canvas border-t border-[#DCE7F8]">
