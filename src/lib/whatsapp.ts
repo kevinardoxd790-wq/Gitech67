@@ -49,7 +49,11 @@ export function generarEnlaceWhatsAppSeguro(params: SafeWhatsAppParams): string 
     }
 
     const trimmedAddress = params.address ? params.address.trim() : "";
-    if (trimmedAddress) {
+    const isRawCoordsAddress = /^-?\d{1,3}\.\d+\s*,\s*-?\d{1,3}\.\d+$/.test(
+      trimmedAddress
+    );
+
+    if (trimmedAddress && !isRawCoordsAddress) {
       msg += `\n\n📍 Dirección: ${trimmedAddress}`;
     }
 
@@ -58,14 +62,22 @@ export function generarEnlaceWhatsAppSeguro(params: SafeWhatsAppParams): string 
       Number.isFinite(params.coordinates?.lat) &&
       Number.isFinite(params.coordinates?.lng);
 
-    // Agrega coordenadas exactas y enlace directo de navegación en Waze
     if (hasValidCoords && params.coordinates) {
       const lat = params.coordinates.lat.toFixed(6);
       const lng = params.coordinates.lng.toFixed(6);
-      msg += `\n🗺️ Coordenadas GPS: ${lat}, ${lng}`;
-      msg += `\n🚗 Enlace Waze: https://waze.com/ul?ll=${lat},${lng}&navigate=yes`;
+      if (!trimmedAddress || isRawCoordsAddress) {
+        msg += "\n";
+      }
+      msg += `\n📌 Google Maps: https://maps.google.com/?q=${lat},${lng}`;
+      msg += `\n🚗 Waze: https://waze.com/ul?ll=${lat},${lng}&navigate=yes`;
     } else if (trimmedAddress) {
-      msg += `\n🚗 Enlace Waze: https://waze.com/ul?q=${encodeURIComponent(
+      if (isRawCoordsAddress) {
+        msg += "\n";
+      }
+      msg += `\n📌 Google Maps: https://maps.google.com/?q=${encodeURIComponent(
+        trimmedAddress
+      )}`;
+      msg += `\n🚗 Waze: https://waze.com/ul?q=${encodeURIComponent(
         trimmedAddress
       )}&navigate=yes`;
     }

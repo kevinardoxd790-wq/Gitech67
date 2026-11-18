@@ -100,7 +100,13 @@ export default function CartDrawer() {
       (pos) => {
         const { latitude, longitude } = pos.coords;
         const formatted = `${latitude.toFixed(6)}, ${longitude.toFixed(6)}`;
-        setLocation(formatted, { lat: latitude, lng: longitude });
+        const currentAddr = address.trim();
+        const isCurrentRawCoords = /^-?\d{1,3}\.\d+\s*,\s*-?\d{1,3}\.\d+$/.test(
+          currentAddr
+        );
+        const preservedAddress =
+          currentAddr && !isCurrentRawCoords ? currentAddr : "";
+        setLocation(preservedAddress, { lat: latitude, lng: longitude });
         setMapQuery(formatted);
         setZoneError(false);
         setLocating(false);
@@ -420,9 +426,9 @@ export default function CartDrawer() {
                       <p className="text-neon-cyan text-xs font-bold">
                         Seleccionar ubicación personalizada
                       </p>
-                      {address.trim() && (
+                      {(address.trim() || coordinates) && (
                         <p className="text-white/60 text-[11px] truncate">
-                          {address}
+                          {address.trim() || "Ubicación GPS seleccionada"}
                         </p>
                       )}
                     </div>
@@ -489,21 +495,40 @@ export default function CartDrawer() {
                       </p>
                     )}
 
-                    {coordinates && (
-                      <div className="text-center space-y-1">
-                        <p className="text-neon-cyan/80 text-[11px] font-mono">
-                          GPS: {coordinates.lat.toFixed(6)},{" "}
-                          {coordinates.lng.toFixed(6)}
-                        </p>
+                    {(coordinates || address.trim()) && (
+                      <div className="flex flex-wrap items-center justify-center gap-3 text-[11px]">
                         <a
-                          href={`https://waze.com/ul?ll=${coordinates.lat.toFixed(
-                            6
-                          )},${coordinates.lng.toFixed(6)}&navigate=yes`}
+                          href={
+                            coordinates
+                              ? `https://maps.google.com/?q=${coordinates.lat.toFixed(
+                                  6
+                                )},${coordinates.lng.toFixed(6)}`
+                              : `https://maps.google.com/?q=${encodeURIComponent(
+                                  address.trim()
+                                )}`
+                          }
                           target="_blank"
                           rel="noopener noreferrer"
-                          className="inline-block text-[11px] font-semibold text-neon-cyan hover:underline"
+                          className="font-semibold text-neon-cyan hover:underline"
                         >
-                          Ver ubicación en Waze ↗
+                          Google Maps ↗
+                        </a>
+                        <span className="text-white/20">·</span>
+                        <a
+                          href={
+                            coordinates
+                              ? `https://waze.com/ul?ll=${coordinates.lat.toFixed(
+                                  6
+                                )},${coordinates.lng.toFixed(6)}&navigate=yes`
+                              : `https://waze.com/ul?q=${encodeURIComponent(
+                                  address.trim()
+                                )}&navigate=yes`
+                          }
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="font-semibold text-neon-cyan hover:underline"
+                        >
+                          Waze ↗
                         </a>
                       </div>
                     )}
