@@ -81,11 +81,7 @@ export default function ProductCard({ product }: ProductCardProps) {
             </span>
           </div>
           <p className="text-[10px] text-green-400 font-semibold mb-3 leading-snug">
-            {fixedPrice > 6.99
-              ? "🚚 Envío gratis en todas las zonas (+ Salvador del Mundo)"
-              : fixedPrice >= 4.99
-                ? "🚚 Envío gratis (todas menos Salvador del Mundo)"
-                : "⛽ $1.50 Salvador del Mundo (1 prod.) · Gratis desde $4.99"}
+            🚚 Envío gratis en todas las zonas (incluye Salvador del Mundo)
           </p>
 
           {/* Add to cart */}

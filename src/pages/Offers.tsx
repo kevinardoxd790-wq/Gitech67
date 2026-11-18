@@ -128,10 +128,10 @@ export default function Offers() {
             </div>
             <div>
               <p className="font-orbitron font-black text-white text-lg">
-                🚚 ENVÍOS GRATIS DESDE $4.99
+                🚚 ENVÍOS GRATIS SIN MÍNIMO DE COMPRA
               </p>
               <p className="text-white/50 text-sm">
-                Desde $4.99 todas las zonas menos Salvador del Mundo · Más de $6.99 incluye Salvador del Mundo
+                Envío gratis para todos los productos en todas las zonas (incluye Salvador del Mundo)
               </p>
             </div>
             <Link to="/envios" className="btn-neon-outline shrink-0 text-xs flex items-center gap-1 px-4 py-2.5">

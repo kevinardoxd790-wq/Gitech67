@@ -126,9 +126,7 @@ CATÁLOGO REAL:
 ${catalogText || "Sin productos."}
 
 ENVÍOS FIJOS:
-- De $4.99 a $6.99: envío gratis en todas las zonas excepto Salvador del Mundo (Galerías Escalón, Torre Futura, 75 Av. Norte, Redondel Masferrer y Redondel Luceiro).
-- Más de $6.99 (> $6.99): envío gratis en TODAS las zonas incluyendo Salvador del Mundo (Gasolinera Texaco).
-- Si solo lleva 1 producto (y total <= $6.99): se lo llevamos a Salvador del Mundo por $1.50 (aplica únicamente por 1 producto).
+- Envío GRATIS para todos los productos, sin mínimo ni límite de precio, en TODAS las zonas principales: Salvador del Mundo (Gasolinera Texaco), Galerías Escalón, Torre Futura, 75 Av. Norte, Redondel Masferrer y Redondel Luceiro.
 - Colonia Escalón: $1.50 extra.
 
 FORMATO JSON OBLIGATORIO:

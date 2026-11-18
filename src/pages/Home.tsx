@@ -280,7 +280,7 @@ export default function Home() {
                 Entregamos en San Salvador
               </h2>
               <p className="text-white/60 text-base leading-relaxed max-w-md">
-                Desde $4.99 gratis en todas las zonas excepto Salvador del Mundo. Más de $6.99 incluye Salvador del Mundo ($1.50 solo si es 1 producto).
+                Envío gratis para todos los productos en todas las zonas, incluyendo Salvador del Mundo, sin mínimo ni límite de precio.
               </p>
             </div>
             <Link to="/envios" className="btn-neon-outline shrink-0 flex items-center gap-2">

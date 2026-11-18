@@ -14,7 +14,7 @@ interface SafeWhatsAppParams {
 
 /**
  * Genera de forma segura el enlace de WhatsApp estructurando el resumen del pedido,
- * el total fijo y las coordenadas exactas del marcador de Google Maps seleccionado.
+ * el total fijo y el enlace de ubicación en Waze seleccionado.
  */
 export function generarEnlaceWhatsAppSeguro(params: SafeWhatsAppParams): string {
   try {
@@ -48,20 +48,26 @@ export function generarEnlaceWhatsAppSeguro(params: SafeWhatsAppParams): string 
       msg += `\n✅ *Total: $${finalAmount.toFixed(2)}*`;
     }
 
-    if (params.address && params.address.trim()) {
-      msg += `\n\n📍 Dirección: ${params.address.trim()}`;
+    const trimmedAddress = params.address ? params.address.trim() : "";
+    if (trimmedAddress) {
+      msg += `\n\n📍 Dirección: ${trimmedAddress}`;
     }
 
-    // Agrega coordenadas exactas del marcador de Google Maps si fueron seleccionadas
-    if (
-      params.coordinates &&
-      Number.isFinite(params.coordinates.lat) &&
-      Number.isFinite(params.coordinates.lng)
-    ) {
+    const hasValidCoords =
+      Boolean(params.coordinates) &&
+      Number.isFinite(params.coordinates?.lat) &&
+      Number.isFinite(params.coordinates?.lng);
+
+    // Agrega coordenadas exactas y enlace directo de navegación en Waze
+    if (hasValidCoords && params.coordinates) {
       const lat = params.coordinates.lat.toFixed(6);
       const lng = params.coordinates.lng.toFixed(6);
       msg += `\n🗺️ Coordenadas GPS: ${lat}, ${lng}`;
-      msg += `\n📌 Pin Google Maps: https://maps.google.com/?q=${lat},${lng}`;
+      msg += `\n🚗 Enlace Waze: https://waze.com/ul?ll=${lat},${lng}&navigate=yes`;
+    } else if (trimmedAddress) {
+      msg += `\n🚗 Enlace Waze: https://waze.com/ul?q=${encodeURIComponent(
+        trimmedAddress
+      )}&navigate=yes`;
     }
 
     msg += `\n\n¿Pueden confirmar el pedido?`;

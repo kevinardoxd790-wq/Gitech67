@@ -87,19 +87,6 @@ export default function CartDrawer() {
   const hasCustomLocation = Boolean(address.trim() || coordinates);
   const canBuyDirect = Boolean(selectedZone || hasCustomLocation);
 
-  const toNextTier =
-    totalPrice < 4.99
-      ? Math.max(0.01, Number((4.99 - totalPrice).toFixed(2)))
-      : totalPrice <= 6.99
-        ? Math.max(0.01, Number((7.0 - totalPrice).toFixed(2)))
-        : null;
-  const nextTierLabel =
-    totalPrice < 4.99
-      ? "Envío gratis en todas las zonas (excepto Salvador del Mundo)"
-      : totalPrice <= 6.99
-        ? "¡Envío gratis en todas las zonas incluyendo Salvador del Mundo!"
-        : null;
-
   function handleUseLocation() {
     setGeoError("");
     if (!navigator.geolocation) {
@@ -411,38 +398,12 @@ export default function CartDrawer() {
                     </div>
                   )}
 
-                  {/* Upsell to next tier */}
-                  {toNextTier !== null && (
-                    <div className="mt-2 pt-3 border-t border-neon-cyan/10">
-                      <span className="text-neon-cyan/70 text-[11px] font-semibold block mb-1">
-                        Agrega ${toNextTier.toFixed(2)} más y desbloquea:
-                      </span>
-                      <p className="text-neon-cyan text-[11px] font-bold">
-                        {nextTierLabel}
-                      </p>
-                      <div className="mt-2 h-1.5 bg-dark-600 rounded-full overflow-hidden">
-                        <div
-                          className="h-full bg-gradient-to-r from-neon-cyan to-neon-blue rounded-full transition-all duration-500"
-                          style={{
-                            width: `${Math.min(
-                              100,
-                              (totalPrice / (totalPrice < 4.99 ? 4.99 : 7)) *
-                                100
-                            )}%`,
-                          }}
-                        />
-                      </div>
-                    </div>
-                  )}
-
-                  {toNextTier === null && (
-                    <div className="mt-2 pt-2 border-t border-green-400/20">
-                      <p className="text-green-400 text-[11px] font-bold text-center">
-                        ✓ Tienes todas las zonas con envío gratis (incluye
-                        Salvador del Mundo)
-                      </p>
-                    </div>
-                  )}
+                  <div className="mt-2 pt-2 border-t border-green-400/20">
+                    <p className="text-green-400 text-[11px] font-bold text-center">
+                      ✓ Envío gratis para todos los productos (incluye Salvador
+                      del Mundo)
+                    </p>
+                  </div>
                 </div>
               </div>
 
@@ -529,10 +490,22 @@ export default function CartDrawer() {
                     )}
 
                     {coordinates && (
-                      <p className="text-neon-cyan/80 text-[11px] font-mono text-center">
-                        GPS: {coordinates.lat.toFixed(6)},{" "}
-                        {coordinates.lng.toFixed(6)}
-                      </p>
+                      <div className="text-center space-y-1">
+                        <p className="text-neon-cyan/80 text-[11px] font-mono">
+                          GPS: {coordinates.lat.toFixed(6)},{" "}
+                          {coordinates.lng.toFixed(6)}
+                        </p>
+                        <a
+                          href={`https://waze.com/ul?ll=${coordinates.lat.toFixed(
+                            6
+                          )},${coordinates.lng.toFixed(6)}&navigate=yes`}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="inline-block text-[11px] font-semibold text-neon-cyan hover:underline"
+                        >
+                          Ver ubicación en Waze ↗
+                        </a>
+                      </div>
                     )}
 
                     <div className="rounded-xl overflow-hidden border border-neon-cyan/20 h-44 bg-dark-900">

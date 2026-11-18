@@ -109,7 +109,7 @@ function generarRespuestaRespaldoLocal(
     ) {
       return {
         respuesta:
-          "Desde $4.99 tienes envío gratis en todas las zonas menos Salvador del Mundo (Galerías Escalón, Torre Futura, 75 Av. Norte, Masferrer y Luceiro). En compras mayores a $6.99 incluye gratis también Salvador del Mundo. Si llevas solo 1 producto, te lo llevamos a Salvador del Mundo por $1.50 (Colonia Escalón siempre $1.50).",
+          "¡El envío es GRATIS para todos los productos sin mínimo de compra! Incluye Salvador del Mundo (Gasolinera Texaco), Galerías Escalón, Torre Futura, 75 Av. Norte, Redondel Masferrer y Redondel Luceiro (Colonia Escalón $1.50).",
         acciones: [],
       };
     }
