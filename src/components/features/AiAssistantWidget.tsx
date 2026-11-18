@@ -1,4 +1,5 @@
 import { useState, useRef, useEffect } from "react";
+import { useLocation } from "react-router-dom";
 import {
   Bot,
   Send,
@@ -10,6 +11,7 @@ import {
 } from "lucide-react";
 import { useCatalog } from "@/hooks/useCatalog";
 import { useCart } from "@/hooks/useCart";
+import { usePerfumeZone } from "@/hooks/usePerfumeZone";
 import { ejecutarAccionesIA, AIRespuestaJSON } from "@/lib/aiExecutor";
 import { onOpenAiAssistant } from "@/lib/aiBridge";
 import { Product } from "@/types";
@@ -63,7 +65,6 @@ function generarRespuestaRespaldoLocal(
     const q = queryText.toLowerCase().trim();
     const acciones: AIRespuestaJSON["acciones"] = [];
 
-    // Reembolsos, devoluciones, garantía o problemas con productos
     if (isRefundOrProblemQuery(q)) {
       return {
         respuesta: REFUND_POLICY_TEXT,
@@ -84,7 +85,6 @@ function generarRespuestaRespaldoLocal(
         normalizedQuery
       );
 
-    // Detecta intención explícita de abrir carrito (solo si NO está pidiendo agregar un producto)
     const wantsOpenCart =
       !wantsAdd &&
       (/\b(abre|abrir|ver|mostrar|muestra|revisar|ir)\b/.test(normalizedQuery) &&
@@ -102,7 +102,6 @@ function generarRespuestaRespaldoLocal(
       };
     }
 
-    // Consultas de envío
     if (
       !wantsAdd &&
       (q.includes("envio") || q.includes("envío") || q.includes("zona"))
@@ -114,7 +113,6 @@ function generarRespuestaRespaldoLocal(
       };
     }
 
-    // Busca el producto con mayor coincidencia exacta en el catálogo real (sin agregar otros artículos)
     const stopWords = new Set([
       "para",
       "de",
@@ -210,7 +208,13 @@ function generarRespuestaRespaldoLocal(
     }
 
     if (matched) {
-      if (wantsAdd && matched.stock > 0) {
+      if (wantsAdd) {
+        if (matched.stock <= 0) {
+          return {
+            respuesta: `"${matched.name}" se encuentra agotado por el momento.`,
+            acciones: [],
+          };
+        }
         const qtyMatch = q.match(/\b(\d+)\b/);
         const cantidad = qtyMatch
           ? Math.max(1, Math.min(Number(qtyMatch[1]), matched.stock))
@@ -227,7 +231,7 @@ function generarRespuestaRespaldoLocal(
       return {
         respuesta: `"${matched.name}" cuesta $${Number(matched.price).toFixed(
           2
-        )} (stock: ${matched.stock}). ${matched.description}`,
+        )} (${matched.stock > 0 ? "Disponible" : "Agotado"}). ${matched.description}`,
         acciones: [],
       };
     }
@@ -236,6 +240,8 @@ function generarRespuestaRespaldoLocal(
       q.includes("hola") ||
       q.includes("buenas") ||
       q.includes("producto") ||
+      q.includes("perfume") ||
+      q.includes("fragancia") ||
       q.includes("catalogo") ||
       q.includes("catálogo") ||
       q.includes("precio") ||
@@ -256,16 +262,15 @@ function generarRespuestaRespaldoLocal(
       };
     }
 
-    // Regla absoluta de rol: rechaza temas ajenos a la tienda
     return {
       respuesta:
-        "Soy exclusivamente el asistente virtual de GoTech SV. Solo atiendo consultas sobre nuestros productos, stock, envíos, reembolsos y pedidos.",
+        "Soy exclusivamente el asistente virtual de GoTech SV. Solo atiendo consultas sobre nuestros productos, disponibilidad, envíos, reembolsos y pedidos.",
       acciones: [],
     };
   } catch {
     return {
       respuesta:
-        "Solo atiendo consultas sobre productos, stock y pedidos de GoTech SV.",
+        "Solo atiendo consultas sobre productos, disponibilidad y pedidos de GoTech SV.",
       acciones: [],
     };
   }
@@ -284,6 +289,10 @@ function summarizeExecutedActions(data: AIRespuestaJSON): string | undefined {
 }
 
 export default function AiAssistantWidget() {
+  const location = useLocation();
+  const isPerfumeTheme = usePerfumeZone();
+  const isAdminTheme = location.pathname.startsWith("/admin");
+
   const { products } = useCatalog();
   const { addToCart, openCart } = useCart();
 
@@ -294,7 +303,7 @@ export default function AiAssistantWidget() {
     {
       id: "welcome",
       role: "assistant",
-      text: "¡Hola! Soy el asistente de GoTech SV. Pregúntame por productos, precios, envíos, reembolsos o pídeme agregar algo a tu carrito.",
+      text: "¡Hola! Soy el asistente de GoTech SV. Pregúntame por productos, perfumes, precios, envíos, reembolsos o pídeme agregar algo a tu carrito.",
     },
   ]);
 
@@ -364,7 +373,6 @@ export default function AiAssistantWidget() {
     setInput("");
     setLoading(true);
 
-    // Respuesta inmediata para solicitudes de reembolso / problemas sin demora innecesaria
     if (isRefundOrProblemQuery(trimmed)) {
       setMessages((prev) => [
         ...prev,
@@ -388,7 +396,7 @@ export default function AiAssistantWidget() {
         id: p.id,
         name: p.name,
         price: p.price,
-        stock: p.stock,
+        stock: p.stock > 0 ? 1 : 0,
         category: p.category,
         description: p.description,
       }));
@@ -439,7 +447,6 @@ export default function AiAssistantWidget() {
         },
       ]);
     } catch {
-      // Modo seguro silencioso: respaldo local para que la tienda nunca falle ni se congele
       try {
         const fallback = generarRespuestaRespaldoLocal(trimmed, products);
         let hasRefundAction = false;
@@ -482,22 +489,55 @@ export default function AiAssistantWidget() {
     void sendMessageText(input);
   };
 
+  if (isAdminTheme) return null;
+
   return (
     <div className="fixed bottom-4 right-4 z-40">
       {isOpen ? (
-        <div className="w-[330px] sm:w-[360px] bg-dark-800 border border-neon-cyan/35 rounded-2xl shadow-neon overflow-hidden flex flex-col max-h-[75vh] animate-slide-up">
+        <div
+          className={`w-[330px] sm:w-[360px] rounded-2xl overflow-hidden flex flex-col max-h-[75vh] animate-slide-up transition-colors duration-300 border ${
+            isPerfumeTheme
+              ? "bg-[#FDF7F5] border-[#DFC5BC] text-[#3B0815] shadow-[0_20px_50px_rgba(77,8,25,0.24)]"
+              : "bg-white border-[#CFE0FA] text-[#0B172A] shadow-[0_20px_50px_rgba(0,68,180,0.20)]"
+          }`}
+        >
           {/* Header */}
-          <div className="flex items-center justify-between px-4 py-3 bg-dark-700/80 border-b border-neon-cyan/20">
-            <div className="flex items-center gap-2">
-              <div className="w-8 h-8 rounded-xl bg-neon-cyan/15 border border-neon-cyan/40 flex items-center justify-center">
-                <Bot className="w-4 h-4 text-neon-cyan" />
+          <div
+            className={`flex items-center justify-between px-4 py-3 border-b transition-colors ${
+              isPerfumeTheme
+                ? "bg-gradient-to-r from-[#5B0A1E] to-[#7A102B] border-[#4D0819] text-[#FFF8F6]"
+                : "bg-gradient-to-r from-[#00349A] via-[#0057FF] to-[#0088FF] border-[#0044CC] text-white"
+            }`}
+          >
+            <div className="flex items-center gap-2.5">
+              <div
+                className={`w-8 h-8 rounded-xl border flex items-center justify-center ${
+                  isPerfumeTheme
+                    ? "bg-[#FFF8F6]/15 border-[#FFE0D6]/40 text-[#FFE0D6]"
+                    : "bg-white/15 border-white/30 text-white"
+                }`}
+              >
+                <Bot className="w-4 h-4" />
               </div>
               <div>
-                <p className="font-orbitron font-bold text-xs text-white flex items-center gap-1">
-                  Asistente GoTech <Sparkles className="w-3 h-3 text-neon-cyan" />
+                <p
+                  className={`font-bold text-xs flex items-center gap-1 ${
+                    isPerfumeTheme
+                      ? "font-playfair tracking-wide text-sm text-[#FFF8F6]"
+                      : "font-montserrat text-white"
+                  }`}
+                >
+                  {isPerfumeTheme ? "Asistente Boutique" : "Asistente GoTech"}{" "}
+                  <Sparkles className="w-3 h-3 opacity-90" />
                 </p>
-                <p className="text-[10px] text-white/45">
-                  Respuestas rápidas · Productos y pedidos
+                <p
+                  className={`text-[10px] ${
+                    isPerfumeTheme ? "text-[#FFE0D6]/85" : "text-white/80"
+                  }`}
+                >
+                  {isPerfumeTheme
+                    ? "Perfumes · Fragancias y pedidos"
+                    : "Respuestas rápidas · Productos y pedidos"}
                 </p>
               </div>
             </div>
@@ -505,16 +545,20 @@ export default function AiAssistantWidget() {
               type="button"
               onClick={() => setIsOpen(false)}
               aria-label="Cerrar chat"
-              className="text-white/40 hover:text-white p-1 transition-colors"
+              className="text-white/75 hover:text-white p-1 transition-colors"
             >
               <X className="w-4 h-4" />
             </button>
           </div>
 
-          {/* Messages */}
+          {/* Messages canvas */}
           <div
             ref={listRef}
-            className="flex-1 overflow-y-auto p-3 space-y-2.5 min-h-[220px] max-h-[340px]"
+            className={`flex-1 overflow-y-auto p-3 space-y-2.5 min-h-[220px] max-h-[340px] ${
+              isPerfumeTheme
+                ? "bg-gradient-to-b from-[#FAF0EC] via-[#FDF8F6] to-[#F6E9E4]"
+                : "bg-gradient-to-b from-[#F4F8FF] via-[#F9FBFF] to-[#EEF4FF]"
+            }`}
           >
             {messages.map((msg) => (
               <div
@@ -526,13 +570,21 @@ export default function AiAssistantWidget() {
                 <div
                   className={`max-w-[85%] rounded-2xl px-3.5 py-2.5 text-xs leading-relaxed ${
                     msg.role === "user"
-                      ? "bg-btn-gradient text-dark-900 font-semibold rounded-br-sm"
-                      : "bg-dark-700 border border-neon-cyan/20 text-white/90 rounded-bl-sm"
+                      ? isPerfumeTheme
+                        ? "bg-[#5B0A1E] text-[#FFF8F6] font-semibold rounded-br-sm shadow-sm"
+                        : "bg-gradient-to-r from-[#00349A] via-[#0057FF] to-[#0088FF] text-white font-semibold rounded-br-sm shadow-sm"
+                      : isPerfumeTheme
+                        ? "bg-white border border-[#E5CEC6] text-[#3B0815] rounded-bl-sm shadow-sm"
+                        : "bg-white border border-[#DCE7F8] text-[#0B172A] rounded-bl-sm shadow-sm"
                   }`}
                 >
                   <p>{msg.text}</p>
                   {msg.actionNote && (
-                    <span className="mt-1.5 inline-flex items-center gap-1 text-[10px] font-bold text-green-400">
+                    <span
+                      className={`mt-1.5 inline-flex items-center gap-1 text-[10px] font-bold ${
+                        isPerfumeTheme ? "text-emerald-700" : "text-emerald-600"
+                      }`}
+                    >
                       <Check className="w-3 h-3" /> {msg.actionNote}
                     </span>
                   )}
@@ -543,7 +595,11 @@ export default function AiAssistantWidget() {
                         target="_blank"
                         rel="noopener noreferrer"
                         onClick={() => handleAcceptWhatsApp(msg.id)}
-                        className="btn-neon py-2 px-3 rounded-xl text-[11px] flex items-center justify-center gap-1.5 font-bold"
+                        className={`py-2 px-3 rounded-xl text-[11px] flex items-center justify-center gap-1.5 font-bold transition-colors ${
+                          isPerfumeTheme
+                            ? "bg-[#5B0A1E] hover:bg-[#7A102B] text-[#FFF8F6]"
+                            : "btn-gotech text-[11px] py-2"
+                        }`}
                       >
                         <MessageCircle className="w-3.5 h-3.5" />
                         Aceptar e ir a WhatsApp
@@ -551,14 +607,22 @@ export default function AiAssistantWidget() {
                       <button
                         type="button"
                         onClick={() => handleStayInStore(msg.id)}
-                        className="w-full py-1.5 px-3 rounded-xl border border-white/15 hover:border-neon-cyan/40 text-white/75 hover:text-white text-[11px] font-semibold transition-colors"
+                        className={`w-full py-1.5 px-3 rounded-xl border text-[11px] font-semibold transition-colors ${
+                          isPerfumeTheme
+                            ? "border-[#DFC5BC] text-[#5B0A1E] hover:bg-[#FAF0EC]"
+                            : "border-[#CFE0FA] text-[#334663] hover:border-[#0057FF] hover:text-[#0057FF]"
+                        }`}
                       >
                         No, quedarme
                       </button>
                     </div>
                   )}
                   {msg.refundChoiceTaken === "whatsapp" && (
-                    <span className="mt-1.5 inline-flex items-center gap-1 text-[10px] font-bold text-green-400">
+                    <span
+                      className={`mt-1.5 inline-flex items-center gap-1 text-[10px] font-bold ${
+                        isPerfumeTheme ? "text-emerald-700" : "text-emerald-600"
+                      }`}
+                    >
                       <Check className="w-3 h-3" /> Abriendo WhatsApp (76299724)
                     </span>
                   )}
@@ -567,7 +631,13 @@ export default function AiAssistantWidget() {
             ))}
             {loading && (
               <div className="flex justify-start">
-                <div className="bg-dark-700 border border-neon-cyan/20 rounded-2xl px-3.5 py-2 text-xs text-neon-cyan animate-pulse">
+                <div
+                  className={`rounded-2xl px-3.5 py-2 text-xs font-semibold animate-pulse border ${
+                    isPerfumeTheme
+                      ? "bg-white border-[#E5CEC6] text-[#7A102B]"
+                      : "bg-white border-[#DCE7F8] text-[#0057FF]"
+                  }`}
+                >
                   Respondiendo...
                 </div>
               </div>
@@ -575,16 +645,30 @@ export default function AiAssistantWidget() {
           </div>
 
           {/* Quick action bar */}
-          <div className="px-3 pb-2 flex gap-1.5 overflow-x-auto">
+          <div
+            className={`px-3 py-2 flex gap-1.5 overflow-x-auto border-t ${
+              isPerfumeTheme
+                ? "bg-[#FAF0EC] border-[#EAE0DC]"
+                : "bg-white border-[#EAF1FC]"
+            }`}
+          >
             <button
               type="button"
               disabled={loading}
               onClick={() =>
-                void sendMessageText("¿Qué productos tienen disponibles?")
+                void sendMessageText(
+                  isPerfumeTheme
+                    ? "¿Qué perfumes tienen disponibles?"
+                    : "¿Qué productos tienen disponibles?"
+                )
               }
-              className="shrink-0 text-[10px] bg-dark-700 border border-neon-cyan/20 hover:border-neon-cyan/50 text-neon-cyan px-2.5 py-1 rounded-full transition-colors disabled:opacity-40"
+              className={`shrink-0 text-[10px] font-semibold border px-2.5 py-1 rounded-full transition-colors disabled:opacity-40 ${
+                isPerfumeTheme
+                  ? "bg-white border-[#DFC5BC] hover:border-[#5B0A1E] text-[#5B0A1E]"
+                  : "bg-[#F4F8FF] border-[#CFE0FA] hover:border-[#0057FF] text-[#0057FF]"
+              }`}
             >
-              📦 Ver catálogo
+              {isPerfumeTheme ? "🌸 Ver perfumes" : "📦 Ver catálogo"}
             </button>
             <button
               type="button"
@@ -592,7 +676,11 @@ export default function AiAssistantWidget() {
               onClick={() =>
                 void sendMessageText("¿Cómo funcionan los envíos gratis?")
               }
-              className="shrink-0 text-[10px] bg-dark-700 border border-neon-cyan/20 hover:border-neon-cyan/50 text-white/75 px-2.5 py-1 rounded-full transition-colors disabled:opacity-40"
+              className={`shrink-0 text-[10px] font-semibold border px-2.5 py-1 rounded-full transition-colors disabled:opacity-40 ${
+                isPerfumeTheme
+                  ? "bg-white border-[#DFC5BC] hover:border-[#5B0A1E] text-[#4D0819]"
+                  : "bg-[#F4F8FF] border-[#CFE0FA] hover:border-[#0057FF] text-[#334663]"
+              }`}
             >
               🚚 Envíos
             </button>
@@ -600,36 +688,65 @@ export default function AiAssistantWidget() {
               type="button"
               disabled={loading}
               onClick={() => void sendMessageText("Quiero consultar por un reembolso")}
-              className="shrink-0 text-[10px] bg-dark-700 border border-neon-cyan/20 hover:border-neon-cyan/50 text-white/75 px-2.5 py-1 rounded-full transition-colors disabled:opacity-40"
+              className={`shrink-0 text-[10px] font-semibold border px-2.5 py-1 rounded-full transition-colors disabled:opacity-40 ${
+                isPerfumeTheme
+                  ? "bg-white border-[#DFC5BC] hover:border-[#5B0A1E] text-[#4D0819]"
+                  : "bg-[#F4F8FF] border-[#CFE0FA] hover:border-[#0057FF] text-[#334663]"
+              }`}
             >
               🔄 Reembolso
             </button>
             <button
               type="button"
               onClick={openCart}
-              className="shrink-0 text-[10px] bg-dark-700 border border-neon-cyan/20 hover:border-neon-cyan/50 text-white/75 px-2.5 py-1 rounded-full flex items-center gap-1 transition-colors"
+              className={`shrink-0 text-[10px] font-semibold border px-2.5 py-1 rounded-full flex items-center gap-1 transition-colors ${
+                isPerfumeTheme
+                  ? "bg-white border-[#DFC5BC] hover:border-[#5B0A1E] text-[#4D0819]"
+                  : "bg-[#F4F8FF] border-[#CFE0FA] hover:border-[#0057FF] text-[#334663]"
+              }`}
             >
-              <ShoppingCart className="w-3 h-3 text-neon-cyan" /> Ver carrito
+              <ShoppingCart
+                className={`w-3 h-3 ${
+                  isPerfumeTheme ? "text-[#5B0A1E]" : "text-[#0057FF]"
+                }`}
+              />{" "}
+              Ver carrito
             </button>
           </div>
 
           {/* Input */}
           <form
             onSubmit={handleSend}
-            className="p-3 border-t border-neon-cyan/20 bg-dark-900/60 flex gap-2"
+            className={`p-3 border-t flex gap-2 ${
+              isPerfumeTheme
+                ? "border-[#E5CEC6] bg-[#FAF0EC]"
+                : "border-[#DCE7F8] bg-[#F4F8FF]"
+            }`}
           >
             <input
               type="text"
               value={input}
               onChange={(e) => setInput(e.target.value)}
-              placeholder="Ej: Agrega el Bluetooth 5.0..."
+              placeholder={
+                isPerfumeTheme
+                  ? "Ej: Agrega el perfume Fairyland..."
+                  : "Ej: Agrega el Bluetooth 5.0..."
+              }
               maxLength={300}
-              className="flex-1 bg-dark-700 border border-neon-cyan/20 rounded-xl px-3 py-2 text-xs text-white placeholder-white/30 focus:outline-none focus:border-neon-cyan/50"
+              className={`flex-1 bg-white border rounded-xl px-3 py-2 text-xs focus:outline-none ${
+                isPerfumeTheme
+                  ? "border-[#DFC5BC] text-[#3B0815] placeholder-[#9D7880] focus:border-[#5B0A1E]"
+                  : "border-[#CFE0FA] text-[#0B172A] placeholder-[#6B7E9E] focus:border-[#0057FF]"
+              }`}
             />
             <button
               type="submit"
               disabled={loading || !input.trim()}
-              className="btn-neon px-3 py-2 rounded-xl flex items-center justify-center disabled:opacity-40"
+              className={`px-3 py-2 rounded-xl flex items-center justify-center disabled:opacity-40 transition-colors ${
+                isPerfumeTheme
+                  ? "bg-[#5B0A1E] hover:bg-[#7A102B] text-[#FFF8F6]"
+                  : "btn-gotech rounded-xl px-3 py-2"
+              }`}
               aria-label="Enviar mensaje"
             >
               <Send className="w-4 h-4" />
@@ -640,11 +757,17 @@ export default function AiAssistantWidget() {
         <button
           type="button"
           onClick={() => setIsOpen(true)}
-          className="btn-neon rounded-full px-4 py-3 shadow-neon flex items-center gap-2 text-xs"
+          className={`rounded-full px-4 py-3 flex items-center gap-2 text-xs font-bold transition-all duration-300 ${
+            isPerfumeTheme
+              ? "bg-gradient-to-r from-[#5B0A1E] to-[#8B1A35] text-[#FFF8F6] border border-[#E5B8A8]/50 shadow-[0_10px_28px_rgba(91,10,30,0.35)] hover:brightness-110"
+              : "btn-gotech rounded-full px-4 py-3 shadow-[0_10px_28px_rgba(0,87,255,0.35)]"
+          }`}
           aria-label="Abrir asistente de compras"
         >
           <Bot className="w-4 h-4" />
-          <span className="hidden sm:inline">Asistente IA</span>
+          <span className="hidden sm:inline">
+            {isPerfumeTheme ? "Asistente Boutique" : "Asistente IA"}
+          </span>
         </button>
       )}
     </div>

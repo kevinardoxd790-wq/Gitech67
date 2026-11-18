@@ -8,6 +8,7 @@ import {
   ReactNode,
 } from "react";
 import { Product } from "@/types";
+import { isPerfumeProduct } from "@/constants/products";
 
 export interface CartItem {
   product: Product;
@@ -85,6 +86,7 @@ interface CartContextType {
   openCart: () => void;
   closeCart: () => void;
   cartBounce: boolean;
+  lastAddedTheme: "perfumes" | "tech";
 }
 
 const CartContext = createContext<CartContextType | null>(null);
@@ -104,6 +106,14 @@ export function CartProvider({ children }: { children: ReactNode }) {
   );
   const [isOpen, setIsOpen] = useState(false);
   const [cartBounce, setCartBounce] = useState(false);
+  const [lastAddedTheme, setLastAddedTheme] = useState<"perfumes" | "tech">(
+    () =>
+      initialRef.current &&
+      initialRef.current.items.length > 0 &&
+      initialRef.current.items.every((i) => isPerfumeProduct(i.product))
+        ? "perfumes"
+        : "tech"
+  );
   const bounceTimerRef = useRef<number | null>(null);
 
   // Persistencia segura del carrito, dirección y coordenadas en localStorage
@@ -174,6 +184,7 @@ export function CartProvider({ children }: { children: ReactNode }) {
         }
         return [...prev, { product, quantity: 1 }];
       });
+      setLastAddedTheme(isPerfumeProduct(product) ? "perfumes" : "tech");
       triggerCartBounce();
       setIsOpen(true);
     },
@@ -229,6 +240,7 @@ export function CartProvider({ children }: { children: ReactNode }) {
         openCart,
         closeCart,
         cartBounce,
+        lastAddedTheme,
       }}
     >
       {children}

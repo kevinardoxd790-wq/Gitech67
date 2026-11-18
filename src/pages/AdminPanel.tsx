@@ -19,6 +19,7 @@ import {
   ImagePlus,
   Link2,
   Plus,
+  Minus,
   X,
 } from "lucide-react";
 import {
@@ -40,6 +41,7 @@ import {
   loadBookings,
   saveBookings,
 } from "@/constants/schedule";
+import { isPerfumeProduct } from "@/constants/products";
 import { useCatalog } from "@/hooks/useCatalog";
 import { Product } from "@/types";
 
@@ -101,6 +103,8 @@ async function compressGalleryImage(file: File): Promise<string> {
 
 const PRESET_CATEGORIES = [
   "Tecnología",
+  "Perfumes Mujer",
+  "Perfumes Hombre",
   "Bluetooth",
   "Memorias",
   "Controles",
@@ -109,9 +113,11 @@ const PRESET_CATEGORIES = [
 ];
 
 function AddProductCard({
+  defaultCategory = "Tecnología",
   onCreate,
   onCancel,
 }: {
+  defaultCategory?: string;
   onCreate: (data: {
     name: string;
     description: string;
@@ -128,9 +134,11 @@ function AddProductCard({
   const [image, setImage] = useState("");
   const [price, setPrice] = useState("");
   const [stock, setStock] = useState("10");
-  const [categorySelect, setCategorySelect] = useState("Tecnología");
+  const [categorySelect, setCategorySelect] = useState(defaultCategory);
   const [customCategory, setCustomCategory] = useState("");
-  const [badge, setBadge] = useState("🆕 NUEVO");
+  const [badge, setBadge] = useState(
+    defaultCategory.toLowerCase().includes("perfume") ? "🌸 60 ML" : "🆕 NUEVO"
+  );
   const [processingImage, setProcessingImage] = useState(false);
   const [saving, setSaving] = useState(false);
   const [showUrlField, setShowUrlField] = useState(false);
@@ -288,18 +296,43 @@ function AddProductCard({
 
             <div>
               <label className="block text-[11px] font-bold uppercase tracking-wider text-neon-cyan/80 mb-1">
-                Stock *
+                Existencias (solo admin) *
               </label>
-              <input
-                type="number"
-                step="1"
-                min="0"
-                max="10000"
-                value={stock}
-                onChange={(e) => setStock(e.target.value)}
-                required
-                className="w-full bg-dark-700 border border-neon-cyan/20 rounded-xl px-3 py-2.5 text-sm text-white font-bold focus:outline-none focus:border-neon-cyan/50"
-              />
+              <div className="flex items-center gap-1.5">
+                <button
+                  type="button"
+                  onClick={() =>
+                    setStock(String(Math.max(0, (Number(stock) || 0) - 1)))
+                  }
+                  className="w-9 h-10 rounded-xl bg-dark-700 border border-neon-cyan/25 text-neon-cyan hover:border-neon-cyan flex items-center justify-center shrink-0"
+                  aria-label="Disminuir existencias"
+                >
+                  <Minus className="w-3.5 h-3.5" />
+                </button>
+                <input
+                  type="number"
+                  step="1"
+                  min="0"
+                  max="10000"
+                  value={stock}
+                  onChange={(e) => setStock(e.target.value)}
+                  required
+                  className="w-full bg-dark-700 border border-neon-cyan/20 rounded-xl px-2 py-2.5 text-sm text-white text-center font-bold focus:outline-none focus:border-neon-cyan/50"
+                />
+                <button
+                  type="button"
+                  onClick={() =>
+                    setStock(String(Math.min(10000, (Number(stock) || 0) + 1)))
+                  }
+                  className="w-9 h-10 rounded-xl bg-dark-700 border border-neon-cyan/25 text-neon-cyan hover:border-neon-cyan flex items-center justify-center shrink-0"
+                  aria-label="Aumentar existencias"
+                >
+                  <Plus className="w-3.5 h-3.5" />
+                </button>
+              </div>
+              <p className="text-[10px] text-white/40 mt-1">
+                Ocultas al cliente (0 = Agotado)
+              </p>
             </div>
           </div>
 
@@ -481,15 +514,23 @@ function ProductEditCard({
     price: number;
     category: string;
     stock: number;
+    badge: string;
   }) => Promise<void>;
   onReset: () => Promise<void>;
   onDelete: () => Promise<void>;
 }) {
+  const isPresetCat = PRESET_CATEGORIES.includes(product.category);
   const [name, setName] = useState(product.name);
   const [description, setDescription] = useState(product.description);
   const [image, setImage] = useState(product.image);
   const [price, setPrice] = useState(product.price.toFixed(2));
-  const [category, setCategory] = useState(product.category);
+  const [categorySelect, setCategorySelect] = useState(
+    isPresetCat ? product.category : "__custom__"
+  );
+  const [customCategory, setCustomCategory] = useState(
+    isPresetCat ? "" : product.category
+  );
+  const [badge, setBadge] = useState(product.badge || "");
   const [stock, setStock] = useState(String(product.stock));
   const [saving, setSaving] = useState(false);
   const [processingImage, setProcessingImage] = useState(false);
@@ -499,11 +540,14 @@ function ProductEditCard({
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
+    const presetMatch = PRESET_CATEGORIES.includes(product.category);
     setName(product.name);
     setDescription(product.description);
     setImage(product.image);
     setPrice(product.price.toFixed(2));
-    setCategory(product.category);
+    setCategorySelect(presetMatch ? product.category : "__custom__");
+    setCustomCategory(presetMatch ? "" : product.category);
+    setBadge(product.badge || "");
     setStock(String(product.stock));
   }, [
     product.name,
@@ -511,6 +555,7 @@ function ProductEditCard({
     product.image,
     product.price,
     product.category,
+    product.badge,
     product.stock,
   ]);
 
@@ -543,14 +588,19 @@ function ProductEditCard({
     e.preventDefault();
     setSaving(true);
     setStatus("");
+    const finalCategory =
+      categorySelect === "__custom__"
+        ? customCategory.trim()
+        : categorySelect.trim();
     try {
       await onSave({
         name,
         description,
         image,
         price: Number(price),
-        category: category.trim() || "Tecnología",
+        category: finalCategory || "Tecnología",
         stock: Math.max(0, Math.min(10000, Math.round(Number(stock) || 0))),
+        badge: badge.trim(),
       });
       setStatus("Guardado en base de datos.");
     } catch (err) {
@@ -587,11 +637,19 @@ function ProductEditCard({
   };
 
   const isGalleryDataUrl = image.startsWith("data:image/");
+  const isPerfume = isPerfumeProduct({
+    id: product.id,
+    category:
+      categorySelect === "__custom__" ? customCategory : categorySelect,
+  });
+  const parsedStock = Math.max(0, Math.min(10000, Math.round(Number(stock) || 0)));
 
   return (
     <form
       onSubmit={handleSave}
-      className="card-tech p-5 space-y-4 border border-neon-cyan/20"
+      className={`card-tech p-5 space-y-4 border ${
+        isPerfume ? "border-rose-400/35" : "border-neon-cyan/20"
+      }`}
     >
       <div className="flex items-start gap-4">
         <img
@@ -616,7 +674,14 @@ function ProductEditCard({
               )
             )}
           </div>
-          <p className="text-white/50 text-xs mt-0.5">{product.category}</p>
+          <div className="flex items-center gap-2 mt-0.5">
+            <p className="text-white/50 text-xs">{product.category}</p>
+            {isPerfume && (
+              <span className="text-[10px] font-bold bg-rose-500/20 text-rose-300 px-2 py-0.5 rounded-full">
+                Perfume
+              </span>
+            )}
+          </div>
         </div>
       </div>
 
@@ -698,26 +763,45 @@ function ProductEditCard({
           />
         </div>
 
-        <div className="grid grid-cols-2 gap-3">
-          <div>
-            <label className="block text-[11px] font-bold uppercase tracking-wider text-neon-cyan/80 mb-1">
-              Precio (USD)
+        <div>
+          <label className="block text-[11px] font-bold uppercase tracking-wider text-neon-cyan/80 mb-1">
+            Precio (USD)
+          </label>
+          <input
+            type="number"
+            step="0.01"
+            min="0"
+            max="10000"
+            value={price}
+            onChange={(e) => setPrice(e.target.value)}
+            required
+            className="w-full bg-dark-700 border border-neon-cyan/20 rounded-xl px-3 py-2 text-sm text-neon-cyan font-bold focus:outline-none focus:border-neon-cyan/50"
+          />
+        </div>
+
+        <div className="bg-dark-700/60 border border-neon-cyan/15 rounded-xl p-3 space-y-2">
+          <div className="flex items-center justify-between gap-2">
+            <label className="block text-[11px] font-bold uppercase tracking-wider text-neon-cyan/80">
+              Existencias (solo admin)
             </label>
-            <input
-              type="number"
-              step="0.01"
-              min="0"
-              max="10000"
-              value={price}
-              onChange={(e) => setPrice(e.target.value)}
-              required
-              className="w-full bg-dark-700 border border-neon-cyan/20 rounded-xl px-3 py-2 text-sm text-neon-cyan font-bold focus:outline-none focus:border-neon-cyan/50"
-            />
+            <span
+              className={`text-[10px] font-bold ${
+                parsedStock === 0 ? "text-red-400" : "text-green-400"
+              }`}
+            >
+              {parsedStock === 0 ? "Agotado en tienda" : "Oculto al cliente"}
+            </span>
           </div>
-          <div>
-            <label className="block text-[11px] font-bold uppercase tracking-wider text-neon-cyan/80 mb-1">
-              Stock
-            </label>
+
+          <div className="flex items-center gap-2">
+            <button
+              type="button"
+              onClick={() => setStock(String(Math.max(0, parsedStock - 1)))}
+              className="w-9 h-9 rounded-lg bg-dark-800 border border-neon-cyan/25 text-neon-cyan hover:border-neon-cyan flex items-center justify-center shrink-0"
+              aria-label="Restar una existencia"
+            >
+              <Minus className="w-3.5 h-3.5" />
+            </button>
             <input
               type="number"
               step="1"
@@ -726,24 +810,87 @@ function ProductEditCard({
               value={stock}
               onChange={(e) => setStock(e.target.value)}
               required
-              className="w-full bg-dark-700 border border-neon-cyan/20 rounded-xl px-3 py-2 text-sm text-white font-bold focus:outline-none focus:border-neon-cyan/50"
+              className="w-full bg-dark-800 border border-neon-cyan/20 rounded-lg px-3 py-1.5 text-sm text-white text-center font-bold focus:outline-none focus:border-neon-cyan/50"
+            />
+            <button
+              type="button"
+              onClick={() => setStock(String(Math.min(10000, parsedStock + 1)))}
+              className="w-9 h-9 rounded-lg bg-dark-800 border border-neon-cyan/25 text-neon-cyan hover:border-neon-cyan flex items-center justify-center shrink-0"
+              aria-label="Sumar una existencia"
+            >
+              <Plus className="w-3.5 h-3.5" />
+            </button>
+          </div>
+
+          <div className="flex flex-wrap gap-1.5">
+            {[0, 3, 5, 10, 20].map((preset) => (
+              <button
+                key={preset}
+                type="button"
+                onClick={() => setStock(String(preset))}
+                className={`px-2 py-1 rounded-lg text-[10px] font-bold border transition-colors ${
+                  parsedStock === preset
+                    ? "bg-neon-cyan/20 border-neon-cyan text-neon-cyan"
+                    : "bg-dark-800 border-white/10 text-white/55 hover:border-neon-cyan/40 hover:text-white"
+                }`}
+              >
+                {preset === 0 ? "0 (Agotado)" : `${preset} u.`}
+              </button>
+            ))}
+          </div>
+        </div>
+
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+          <div>
+            <label className="block text-[11px] font-bold uppercase tracking-wider text-neon-cyan/80 mb-1">
+              Categoría
+            </label>
+            <select
+              value={categorySelect}
+              onChange={(e) => setCategorySelect(e.target.value)}
+              className="w-full bg-dark-700 border border-neon-cyan/20 rounded-xl px-3 py-2 text-xs text-white focus:outline-none focus:border-neon-cyan/50"
+            >
+              {PRESET_CATEGORIES.map((cat) => (
+                <option key={cat} value={cat} className="bg-dark-800">
+                  {cat}
+                </option>
+              ))}
+              <option value="__custom__" className="bg-dark-800">
+                Otra categoría...
+              </option>
+            </select>
+          </div>
+
+          <div>
+            <label className="block text-[11px] font-bold uppercase tracking-wider text-neon-cyan/80 mb-1">
+              Etiqueta
+            </label>
+            <input
+              type="text"
+              value={badge}
+              onChange={(e) => setBadge(e.target.value)}
+              maxLength={60}
+              placeholder="Opcional"
+              className="w-full bg-dark-700 border border-neon-cyan/20 rounded-xl px-3 py-2 text-xs text-white placeholder-white/25 focus:outline-none focus:border-neon-cyan/50"
             />
           </div>
         </div>
 
-        <div>
-          <label className="block text-[11px] font-bold uppercase tracking-wider text-neon-cyan/80 mb-1">
-            Categoría
-          </label>
-          <input
-            type="text"
-            value={category}
-            onChange={(e) => setCategory(e.target.value)}
-            maxLength={60}
-            required
-            className="w-full bg-dark-700 border border-neon-cyan/20 rounded-xl px-3 py-2 text-xs text-white focus:outline-none focus:border-neon-cyan/50"
-          />
-        </div>
+        {categorySelect === "__custom__" && (
+          <div>
+            <label className="block text-[11px] font-bold uppercase tracking-wider text-neon-cyan/80 mb-1">
+              Nombre de categoría
+            </label>
+            <input
+              type="text"
+              value={customCategory}
+              onChange={(e) => setCustomCategory(e.target.value)}
+              maxLength={60}
+              required
+              className="w-full bg-dark-700 border border-neon-cyan/20 rounded-xl px-3 py-2 text-xs text-white focus:outline-none focus:border-neon-cyan/50"
+            />
+          </div>
+        )}
       </div>
 
       {status && (
@@ -842,6 +989,9 @@ export default function AdminPanel() {
   const [activeTab, setActiveTab] = useState<"entregas" | "productos">(
     "entregas"
   );
+  const [productSectionFilter, setProductSectionFilter] = useState<
+    "all" | "perfumes" | "tech"
+  >("all");
   const [showAddProductForm, setShowAddProductForm] = useState(false);
   const [productNotice, setProductNotice] = useState("");
   const [showDeletedList, setShowDeletedList] = useState(false);
@@ -1437,80 +1587,125 @@ export default function AdminPanel() {
         )}
 
         {/* TAB 2: PRODUCTOS */}
-        {activeTab === "productos" && (
-          <div className="space-y-6">
-            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 card-tech p-4 border border-neon-cyan/20">
-              <div>
-                <h2 className="font-orbitron font-bold text-sm text-white">
-                  Catálogo Web ({products.length} productos activos)
-                </h2>
-                <p className="text-white/45 text-xs mt-0.5">
-                  Agrega productos nuevos con foto de galería y muéstralos al instante en la web
-                </p>
-              </div>
-              <button
-                type="button"
-                onClick={() => {
-                  setShowAddProductForm((v) => !v);
-                  setProductNotice("");
-                }}
-                className="btn-neon flex items-center justify-center gap-2 px-5 py-2.5 text-xs shrink-0"
-              >
-                {showAddProductForm ? (
-                  <>
-                    <X className="w-4 h-4" /> Cerrar formulario
-                  </>
-                ) : (
-                  <>
-                    <Plus className="w-4 h-4" /> Agregar producto
-                  </>
-                )}
-              </button>
-            </div>
+        {activeTab === "productos" && (() => {
+          const perfumeItems = products.filter((p) => isPerfumeProduct(p));
+          const techItems = products.filter((p) => !isPerfumeProduct(p));
+          const visibleProducts =
+            productSectionFilter === "perfumes"
+              ? perfumeItems
+              : productSectionFilter === "tech"
+                ? techItems
+                : products;
 
-            {productNotice && (
-              <div className="p-3.5 rounded-xl bg-green-500/10 border border-green-400/30 text-green-400 text-xs font-semibold">
-                {productNotice}
+          return (
+            <div className="space-y-6">
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 card-tech p-4 border border-neon-cyan/20">
+                <div>
+                  <h2 className="font-orbitron font-bold text-sm text-white">
+                    Catálogo y Perfumes ({products.length} activos)
+                  </h2>
+                  <p className="text-white/45 text-xs mt-0.5">
+                    Edita títulos, precios, categorías y existencias (las existencias no se muestran al cliente)
+                  </p>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setShowAddProductForm((v) => !v);
+                    setProductNotice("");
+                  }}
+                  className="btn-neon flex items-center justify-center gap-2 px-5 py-2.5 text-xs shrink-0"
+                >
+                  {showAddProductForm ? (
+                    <>
+                      <X className="w-4 h-4" /> Cerrar formulario
+                    </>
+                  ) : (
+                    <>
+                      <Plus className="w-4 h-4" /> Agregar producto
+                    </>
+                  )}
+                </button>
               </div>
-            )}
 
-            {showAddProductForm && (
-              <AddProductCard
-                onCreate={async (data) => {
-                  await createProduct(data, adminProof);
-                  setShowAddProductForm(false);
-                  setProductNotice(
-                    `Producto "${data.name}" publicado en la web correctamente.`
+              {/* Filter by Catalog vs Perfumes */}
+              <div className="flex flex-wrap gap-2">
+                {(
+                  [
+                    { id: "all", label: `Todos (${products.length})` },
+                    { id: "perfumes", label: `Perfumes (${perfumeItems.length})` },
+                    { id: "tech", label: `Catálogo Tech (${techItems.length})` },
+                  ] as const
+                ).map((tab) => {
+                  const active = productSectionFilter === tab.id;
+                  return (
+                    <button
+                      key={tab.id}
+                      type="button"
+                      onClick={() => setProductSectionFilter(tab.id)}
+                      className={`px-4 py-2 rounded-xl text-xs font-bold uppercase tracking-wider border transition-all ${
+                        active
+                          ? tab.id === "perfumes"
+                            ? "border-rose-400 bg-rose-500/20 text-rose-200"
+                            : "border-neon-cyan bg-neon-cyan/15 text-neon-cyan shadow-neon-sm"
+                          : "border-white/10 text-white/50 hover:border-neon-cyan/30 hover:text-white"
+                      }`}
+                    >
+                      {tab.label}
+                    </button>
                   );
-                }}
-                onCancel={() => setShowAddProductForm(false)}
-              />
-            )}
+                })}
+              </div>
 
-            {products.length === 0 ? (
-              <div className="card-tech p-10 text-center">
-                <ShoppingBag className="w-10 h-10 text-neon-cyan/30 mx-auto mb-3" />
-                <p className="text-white/60 text-sm">
-                  No hay productos activos en el catálogo.
-                </p>
-              </div>
-            ) : (
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                {products.map((product) => (
-                  <ProductEditCard
-                    key={product.id}
-                    product={product}
-                    isOverridden={Boolean(productOverrides[product.id])}
-                    isCustom={Boolean(customProductIds[product.id])}
-                    onSave={(data) =>
-                      saveProductOverride(product.id, data, adminProof)
-                    }
-                    onReset={() => resetProductOverride(product.id, adminProof)}
-                    onDelete={() => deleteProduct(product, adminProof)}
-                  />
-                ))}
-              </div>
-            )}
+              {productNotice && (
+                <div className="p-3.5 rounded-xl bg-green-500/10 border border-green-400/30 text-green-400 text-xs font-semibold">
+                  {productNotice}
+                </div>
+              )}
+
+              {showAddProductForm && (
+                <AddProductCard
+                  key={productSectionFilter}
+                  defaultCategory={
+                    productSectionFilter === "perfumes"
+                      ? "Perfumes Mujer"
+                      : "Tecnología"
+                  }
+                  onCreate={async (data) => {
+                    await createProduct(data, adminProof);
+                    setShowAddProductForm(false);
+                    setProductNotice(
+                      `Producto "${data.name}" publicado en la web correctamente.`
+                    );
+                  }}
+                  onCancel={() => setShowAddProductForm(false)}
+                />
+              )}
+
+              {visibleProducts.length === 0 ? (
+                <div className="card-tech p-10 text-center">
+                  <ShoppingBag className="w-10 h-10 text-neon-cyan/30 mx-auto mb-3" />
+                  <p className="text-white/60 text-sm">
+                    No hay productos activos en esta sección.
+                  </p>
+                </div>
+              ) : (
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                  {visibleProducts.map((product) => (
+                    <ProductEditCard
+                      key={product.id}
+                      product={product}
+                      isOverridden={Boolean(productOverrides[product.id])}
+                      isCustom={Boolean(customProductIds[product.id])}
+                      onSave={(data) =>
+                        saveProductOverride(product.id, data, adminProof)
+                      }
+                      onReset={() => resetProductOverride(product.id, adminProof)}
+                      onDelete={() => deleteProduct(product, adminProof)}
+                    />
+                  ))}
+                </div>
+              )}
 
             {deletedProducts.length > 0 && (
               <div className="card-tech p-4 border border-white/10">
@@ -1551,7 +1746,8 @@ export default function AdminPanel() {
               </div>
             )}
           </div>
-        )}
+          );
+        })()}
 
         <p className="text-white/15 text-[10px] text-center mt-8">
           Panel Admin GoTech · Contraseña y cambios de catálogo guardados en Firestore

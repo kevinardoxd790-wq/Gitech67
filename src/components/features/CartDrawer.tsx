@@ -1,4 +1,5 @@
 import { useState, useEffect, useRef } from "react";
+import { useLocation } from "react-router-dom";
 import {
   X,
   Plus,
@@ -14,7 +15,12 @@ import {
   ChevronUp,
 } from "lucide-react";
 import { useCart, Coordinates } from "@/hooks/useCart";
-import { getShippingZones, getShippingLabel } from "@/constants/products";
+import { useCatalog } from "@/hooks/useCatalog";
+import {
+  getShippingZones,
+  getShippingLabel,
+  isPerfumeProduct,
+} from "@/constants/products";
 import { generarEnlaceWhatsAppSeguro } from "@/lib/whatsapp";
 
 function extractCoordinates(text: string): Coordinates | null {
@@ -38,6 +44,8 @@ function extractCoordinates(text: string): Coordinates | null {
 }
 
 export default function CartDrawer() {
+  const location = useLocation();
+  const { products } = useCatalog();
   const {
     items,
     address,
@@ -51,7 +59,24 @@ export default function CartDrawer() {
     totalItems,
     isOpen,
     closeCart,
+    lastAddedTheme,
   } = useCart();
+
+  const detailId = location.pathname.startsWith("/producto/")
+    ? location.pathname.slice("/producto/".length)
+    : "";
+  const activeDetailProduct = detailId
+    ? products.find((p) => p.id === detailId)
+    : undefined;
+
+  const isPerfumeTheme =
+    location.pathname === "/perfumes"
+      ? true
+      : activeDetailProduct
+        ? isPerfumeProduct(activeDetailProduct)
+        : location.pathname === "/"
+          ? lastAddedTheme === "perfumes"
+          : false;
 
   const [selectedZone, setSelectedZone] = useState<string>("");
   const [zoneError, setZoneError] = useState(false);
@@ -167,28 +192,62 @@ export default function CartDrawer() {
     <>
       {/* Backdrop */}
       <div
-        className="fixed inset-0 z-40 bg-black/60 backdrop-blur-sm"
+        className={`fixed inset-0 z-40 backdrop-blur-sm ${
+          isPerfumeTheme ? "bg-[#2A050E]/45" : "bg-[#0B172A]/45"
+        }`}
         onClick={closeCart}
       />
 
       {/* Single Cart Window */}
-      <div className="fixed top-0 right-0 h-full w-full max-w-md z-50 flex flex-col bg-dark-800 border-l border-neon-cyan/20 shadow-neon animate-slide-up overflow-hidden">
+      <div
+        className={`fixed top-0 right-0 h-full w-full max-w-md z-50 flex flex-col animate-slide-up overflow-hidden border-l font-montserrat ${
+          isPerfumeTheme
+            ? "bg-[#FDF7F5] border-[#DFC5BC] text-[#3B0815] shadow-[-12px_0_40px_rgba(77,8,25,0.18)]"
+            : "bg-[#F4F8FF] border-[#CFE0FA] text-[#0B172A] shadow-[-12px_0_40px_rgba(0,68,180,0.16)]"
+        }`}
+      >
         {/* Header */}
-        <div className="flex items-center justify-between px-5 py-4 border-b border-neon-cyan/20 bg-dark-700/60 shrink-0">
+        <div
+          className={`flex items-center justify-between px-5 py-4 border-b shrink-0 ${
+            isPerfumeTheme
+              ? "bg-[#FAF0EC] border-[#E2C8BF]"
+              : "bg-white border-[#DCE7F8]"
+          }`}
+        >
           <div className="flex items-center gap-2">
-            <ShoppingCart className="w-5 h-5 text-neon-cyan" />
-            <h2 className="font-orbitron font-bold text-white text-base">
+            <ShoppingCart
+              className={`w-5 h-5 ${
+                isPerfumeTheme ? "text-[#5B0A1E]" : "text-[#0057FF]"
+              }`}
+            />
+            <h2
+              className={`font-bold ${
+                isPerfumeTheme
+                  ? "font-playfair text-[#4D0819] text-lg"
+                  : "font-montserrat text-[#0B172A] text-base font-extrabold"
+              }`}
+            >
               Mi Carrito
             </h2>
             {totalItems > 0 && (
-              <span className="bg-neon-cyan text-dark-900 font-black text-xs w-5 h-5 rounded-full flex items-center justify-center">
+              <span
+                className={`font-black text-xs w-5 h-5 rounded-full flex items-center justify-center ${
+                  isPerfumeTheme
+                    ? "bg-[#5B0A1E] text-[#FFF8F6]"
+                    : "bg-[#0057FF] text-white"
+                }`}
+              >
                 {totalItems}
               </span>
             )}
           </div>
           <button
             onClick={closeCart}
-            className="text-white/40 hover:text-white transition-colors p-1"
+            className={`transition-colors p-1 ${
+              isPerfumeTheme
+                ? "text-[#8B5D68] hover:text-[#4D0819]"
+                : "text-[#6B7E9E] hover:text-[#0B172A]"
+            }`}
             aria-label="Cerrar carrito"
           >
             <X className="w-5 h-5" />
@@ -198,12 +257,35 @@ export default function CartDrawer() {
         {/* Empty state */}
         {items.length === 0 ? (
           <div className="flex-1 flex flex-col items-center justify-center gap-4 px-6 text-center">
-            <div className="w-16 h-16 rounded-2xl bg-neon-cyan/10 border border-neon-cyan/20 flex items-center justify-center">
-              <ShoppingCart className="w-8 h-8 text-neon-cyan/40" />
+            <div
+              className={`w-16 h-16 rounded-2xl border flex items-center justify-center ${
+                isPerfumeTheme
+                  ? "bg-[#FAF0EC] border-[#E2C8BF]"
+                  : "bg-white border-[#DCE7F8] shadow-sm"
+              }`}
+            >
+              <ShoppingCart
+                className={`w-8 h-8 ${
+                  isPerfumeTheme ? "text-[#8B1A35]/50" : "text-[#0057FF]/45"
+                }`}
+              />
             </div>
-            <p className="text-white/50 text-sm">Tu carrito está vacío</p>
-            <button onClick={closeCart} className="btn-neon text-sm px-6 py-2.5">
-              Ver productos
+            <p
+              className={`text-sm ${
+                isPerfumeTheme ? "text-[#6B4A52]" : "text-[#4D607D]"
+              }`}
+            >
+              Tu carrito está vacío
+            </p>
+            <button
+              onClick={closeCart}
+              className={
+                isPerfumeTheme
+                  ? "bg-[#5B0A1E] hover:bg-[#7A102B] text-white text-xs font-bold uppercase tracking-wider px-6 py-3 rounded-xl transition-colors"
+                  : "btn-gotech text-sm px-6 py-2.5"
+              }
+            >
+              {isPerfumeTheme ? "Ver perfumes" : "Ver productos"}
             </button>
           </div>
         ) : (
@@ -217,19 +299,37 @@ export default function CartDrawer() {
                   return (
                     <div
                       key={product.id}
-                      className="card-tech p-3 flex gap-3 items-start"
+                      className={`p-3 flex gap-3 items-start rounded-xl border ${
+                        isPerfumeTheme
+                          ? "bg-white border-[#E6D1CA]"
+                          : "bg-white border-[#DCE7F8] shadow-[0_6px_18px_rgba(0,68,180,0.06)]"
+                      }`}
                     >
                       <img
                         src={product.image}
                         alt={product.name}
-                        className="w-16 h-16 object-cover rounded-xl shrink-0 bg-dark-700"
+                        className={`w-16 h-16 object-cover rounded-xl shrink-0 ${
+                          isPerfumeTheme ? "bg-[#FAF2EF]" : "bg-[#F4F8FF]"
+                        }`}
                       />
                       <div className="flex-1 min-w-0">
-                        <p className="text-white font-semibold text-xs leading-tight line-clamp-2 mb-1">
+                        <p
+                          className={`font-semibold text-xs leading-tight line-clamp-2 mb-1 ${
+                            isPerfumeTheme
+                              ? "font-playfair text-sm text-[#3B0815]"
+                              : "text-[#0B172A] font-bold"
+                          }`}
+                        >
                           {product.name}
                         </p>
                         <div className="flex items-center gap-1.5 mb-2">
-                          <span className="text-neon-cyan font-black text-sm">
+                          <span
+                            className={`font-black text-sm ${
+                              isPerfumeTheme
+                                ? "font-playfair text-[#5B0A1E]"
+                                : "text-[#0057FF]"
+                            }`}
+                          >
                             ${fixedPrice.toFixed(2)}
                           </span>
                         </div>
@@ -239,11 +339,19 @@ export default function CartDrawer() {
                             onClick={() =>
                               updateQuantity(product.id, quantity - 1)
                             }
-                            className="w-6 h-6 rounded-lg bg-dark-700 border border-neon-cyan/20 flex items-center justify-center text-neon-cyan hover:border-neon-cyan/50 transition-colors"
+                            className={`w-6 h-6 rounded-lg border flex items-center justify-center transition-colors ${
+                              isPerfumeTheme
+                                ? "bg-[#FAF0EC] border-[#DFC5BC] text-[#5B0A1E] hover:border-[#5B0A1E]"
+                                : "bg-[#F4F8FF] border-[#CFE0FA] text-[#0057FF] hover:border-[#0057FF]"
+                            }`}
                           >
                             <Minus className="w-3 h-3" />
                           </button>
-                          <span className="text-white font-bold text-sm w-5 text-center">
+                          <span
+                            className={`font-bold text-sm w-5 text-center ${
+                              isPerfumeTheme ? "text-[#3B0815]" : "text-[#0B172A]"
+                            }`}
+                          >
                             {quantity}
                           </span>
                           <button
@@ -251,23 +359,34 @@ export default function CartDrawer() {
                               updateQuantity(product.id, quantity + 1)
                             }
                             disabled={quantity >= product.stock}
-                            className="w-6 h-6 rounded-lg bg-dark-700 border border-neon-cyan/20 flex items-center justify-center text-neon-cyan hover:border-neon-cyan/50 transition-colors disabled:opacity-30 disabled:cursor-not-allowed"
+                            className={`w-6 h-6 rounded-lg border flex items-center justify-center transition-colors disabled:opacity-30 disabled:cursor-not-allowed ${
+                              isPerfumeTheme
+                                ? "bg-[#FAF0EC] border-[#DFC5BC] text-[#5B0A1E] hover:border-[#5B0A1E]"
+                                : "bg-[#F4F8FF] border-[#CFE0FA] text-[#0057FF] hover:border-[#0057FF]"
+                            }`}
                           >
                             <Plus className="w-3 h-3" />
                           </button>
-                          <span className="text-white/20 text-[10px] ml-1">
-                            max {product.stock}
-                          </span>
                         </div>
                       </div>
                       <div className="flex flex-col items-end gap-2 shrink-0">
                         <button
                           onClick={() => removeFromCart(product.id)}
-                          className="text-white/20 hover:text-red-400 transition-colors"
+                          className={`transition-colors ${
+                            isPerfumeTheme
+                              ? "text-[#B08D95] hover:text-red-600"
+                              : "text-[#8EA0BA] hover:text-red-600"
+                          }`}
                         >
                           <Trash2 className="w-4 h-4" />
                         </button>
-                        <span className="text-white/60 text-xs font-bold">
+                        <span
+                          className={`text-xs font-bold ${
+                            isPerfumeTheme
+                              ? "text-[#5E3A43]"
+                              : "text-[#4D607D]"
+                          }`}
+                        >
                           ${(fixedPrice * quantity).toFixed(2)}
                         </span>
                       </div>
@@ -279,27 +398,56 @@ export default function CartDrawer() {
               {/* Zone Selector (Same Cart Window) */}
               <div
                 ref={zoneSectionRef}
-                className={`rounded-xl border bg-dark-700/50 overflow-hidden transition-colors ${
-                  zoneError
-                    ? "border-orange-400/70"
-                    : "border-neon-cyan/20"
+                className={`rounded-xl border overflow-hidden transition-colors ${
+                  isPerfumeTheme
+                    ? `bg-white ${
+                        zoneError ? "border-amber-600" : "border-[#E5CEC6]"
+                      }`
+                    : `bg-white shadow-[0_6px_18px_rgba(0,68,180,0.06)] ${
+                        zoneError
+                          ? "border-amber-500"
+                          : "border-[#DCE7F8]"
+                      }`
                 }`}
               >
-                <div className="flex items-center gap-2 px-4 py-3 border-b border-neon-cyan/10 bg-neon-cyan/5">
-                  <Truck className="w-4 h-4 text-neon-cyan shrink-0" />
-                  <p className="text-neon-cyan text-xs font-bold uppercase tracking-wider">
+                <div
+                  className={`flex items-center gap-2 px-4 py-3 border-b ${
+                    isPerfumeTheme
+                      ? "border-[#E5CEC6] bg-[#FAF0EC]"
+                      : "border-[#DCE7F8] bg-[#F4F8FF]"
+                  }`}
+                >
+                  <Truck
+                    className={`w-4 h-4 shrink-0 ${
+                      isPerfumeTheme ? "text-[#5B0A1E]" : "text-[#0057FF]"
+                    }`}
+                  />
+                  <p
+                    className={`text-xs font-bold uppercase tracking-wider ${
+                      isPerfumeTheme ? "text-[#5B0A1E]" : "text-[#0057FF]"
+                    }`}
+                  >
                     Elige tu zona de entrega
                   </p>
                 </div>
 
                 <div className="p-4 space-y-2.5">
-                  <p className="text-white text-xs font-semibold leading-relaxed">
+                  <p
+                    className={`text-xs font-semibold leading-relaxed ${
+                      isPerfumeTheme ? "text-[#3B0815]" : "text-[#0B172A]"
+                    }`}
+                  >
                     {shippingLabel}
                   </p>
 
                   {zoneError && (
-                    <p className="text-orange-400 text-[11px] font-bold">
-                      Selecciona una zona de entrega o ingresa tu ubicación personalizada.
+                    <p
+                      className={`text-[11px] font-bold ${
+                        isPerfumeTheme ? "text-amber-700" : "text-amber-700"
+                      }`}
+                    >
+                      Selecciona una zona de entrega o ingresa tu ubicación
+                      personalizada.
                     </p>
                   )}
 
@@ -317,32 +465,58 @@ export default function CartDrawer() {
                               setZoneError(false);
                             }}
                             className={`w-full flex items-center justify-between rounded-xl px-3 py-2 text-left transition-all border ${
-                              active
-                                ? "border-neon-cyan bg-neon-cyan/15"
-                                : "border-white/10 bg-dark-800/60 hover:border-neon-cyan/40"
+                              isPerfumeTheme
+                                ? active
+                                  ? "border-[#5B0A1E] bg-[#F7E8E3]"
+                                  : "border-[#EAD9D3] bg-[#FDF9F8] hover:border-[#A6596C]"
+                                : active
+                                  ? "border-[#0057FF] bg-[#EAF2FF]"
+                                  : "border-[#E2ECFA] bg-[#F8FAFF] hover:border-[#0057FF]/50"
                             }`}
                           >
                             <div className="flex items-center gap-2 min-w-0">
                               <div
                                 className={`w-3.5 h-3.5 rounded-full border-2 flex items-center justify-center shrink-0 ${
-                                  active
-                                    ? "border-neon-cyan"
-                                    : "border-white/25"
+                                  isPerfumeTheme
+                                    ? active
+                                      ? "border-[#5B0A1E]"
+                                      : "border-[#C9A89D]"
+                                    : active
+                                      ? "border-[#0057FF]"
+                                      : "border-[#B6C8E6]"
                                 }`}
                               >
                                 {active && (
-                                  <div className="w-1.5 h-1.5 rounded-full bg-neon-cyan" />
+                                  <div
+                                    className={`w-1.5 h-1.5 rounded-full ${
+                                      isPerfumeTheme
+                                        ? "bg-[#5B0A1E]"
+                                        : "bg-[#0057FF]"
+                                    }`}
+                                  />
                                 )}
                               </div>
                               <span
                                 className={`text-[11px] font-semibold truncate ${
-                                  active ? "text-white" : "text-white/70"
+                                  isPerfumeTheme
+                                    ? active
+                                      ? "text-[#3B0815]"
+                                      : "text-[#6B4A52]"
+                                    : active
+                                      ? "text-[#0B172A] font-bold"
+                                      : "text-[#4D607D]"
                                 }`}
                               >
                                 {z.name}
                               </span>
                             </div>
-                            <span className="text-green-400 text-[11px] font-bold shrink-0 ml-2">
+                            <span
+                              className={`text-[11px] font-bold shrink-0 ml-2 ${
+                                isPerfumeTheme
+                                  ? "text-emerald-700"
+                                  : "text-emerald-700"
+                              }`}
+                            >
                               GRATIS
                             </span>
                           </button>
@@ -365,37 +539,63 @@ export default function CartDrawer() {
                               setZoneError(false);
                             }}
                             className={`w-full flex items-center justify-between rounded-xl px-3 py-2 text-left transition-all border ${
-                              active
-                                ? "border-neon-cyan bg-neon-cyan/15"
-                                : "border-white/10 bg-dark-800/60 hover:border-neon-cyan/40"
+                              isPerfumeTheme
+                                ? active
+                                  ? "border-[#5B0A1E] bg-[#F7E8E3]"
+                                  : "border-[#EAD9D3] bg-[#FDF9F8] hover:border-[#A6596C]"
+                                : active
+                                  ? "border-[#0057FF] bg-[#EAF2FF]"
+                                  : "border-[#E2ECFA] bg-[#F8FAFF] hover:border-[#0057FF]/50"
                             }`}
                           >
                             <div className="flex items-center gap-2 min-w-0">
                               <div
                                 className={`w-3.5 h-3.5 rounded-full border-2 flex items-center justify-center shrink-0 ${
-                                  active
-                                    ? "border-neon-cyan"
-                                    : "border-white/25"
+                                  isPerfumeTheme
+                                    ? active
+                                      ? "border-[#5B0A1E]"
+                                      : "border-[#C9A89D]"
+                                    : active
+                                      ? "border-[#0057FF]"
+                                      : "border-[#B6C8E6]"
                                 }`}
                               >
                                 {active && (
-                                  <div className="w-1.5 h-1.5 rounded-full bg-neon-cyan" />
+                                  <div
+                                    className={`w-1.5 h-1.5 rounded-full ${
+                                      isPerfumeTheme
+                                        ? "bg-[#5B0A1E]"
+                                        : "bg-[#0057FF]"
+                                    }`}
+                                  />
                                 )}
                               </div>
                               <span
                                 className={`text-[11px] font-semibold leading-tight ${
-                                  active ? "text-white" : "text-white/70"
+                                  isPerfumeTheme
+                                    ? active
+                                      ? "text-[#3B0815]"
+                                      : "text-[#6B4A52]"
+                                    : active
+                                      ? "text-[#0B172A] font-bold"
+                                      : "text-[#4D607D]"
                                 }`}
                               >
                                 {z.name}
                                 {z.note && (
-                                  <span className="block text-[10px] text-orange-300/85 font-normal">
+                                  <span className="block text-[10px] opacity-80 font-normal">
                                     {z.note}
                                   </span>
                                 )}
                               </span>
                             </div>
-                            <span className="text-orange-400 text-[11px] font-bold shrink-0 ml-2">
+                            <span
+                              className={`text-[11px] font-bold shrink-0 ml-2 ${
+                                isPerfumeTheme
+                                  ? "text-amber-700"
+                                  : "text-amber-700"
+                              }`}
+                            >
                               +${z.cost.toFixed(2)}
                             </span>
                           </button>
@@ -404,8 +604,18 @@ export default function CartDrawer() {
                     </div>
                   )}
 
-                  <div className="mt-2 pt-2 border-t border-green-400/20">
-                    <p className="text-green-400 text-[11px] font-bold text-center">
+                  <div
+                    className={`mt-2 pt-2 border-t ${
+                      isPerfumeTheme
+                        ? "border-emerald-700/20"
+                        : "border-emerald-600/20"
+                    }`}
+                  >
+                    <p
+                      className={`text-[11px] font-bold text-center ${
+                        isPerfumeTheme ? "text-emerald-800" : "text-emerald-700"
+                      }`}
+                    >
                       ✓ Envío gratis para todos los productos (incluye Salvador
                       del Mundo)
                     </p>
@@ -414,36 +624,80 @@ export default function CartDrawer() {
               </div>
 
               {/* Custom Location Toggle + Inline Map (Same Cart Window) */}
-              <div className="rounded-xl border border-neon-cyan/20 bg-dark-700/40 overflow-hidden">
+              <div
+                className={`rounded-xl border overflow-hidden ${
+                  isPerfumeTheme
+                    ? "border-[#E5CEC6] bg-white"
+                    : "border-[#DCE7F8] bg-white shadow-[0_6px_18px_rgba(0,68,180,0.06)]"
+                }`}
+              >
                 <button
                   type="button"
                   onClick={() => setShowCustomLocation((v) => !v)}
-                  className="w-full flex items-center justify-between gap-2 px-4 py-3 text-left hover:bg-neon-cyan/5 transition-colors"
+                  className={`w-full flex items-center justify-between gap-2 px-4 py-3 text-left transition-colors ${
+                    isPerfumeTheme
+                      ? "hover:bg-[#FAF0EC]"
+                      : "hover:bg-[#F4F8FF]"
+                  }`}
                 >
                   <div className="flex items-center gap-2 min-w-0">
-                    <MapPin className="w-4 h-4 text-neon-cyan shrink-0" />
+                    <MapPin
+                      className={`w-4 h-4 shrink-0 ${
+                        isPerfumeTheme ? "text-[#5B0A1E]" : "text-[#0057FF]"
+                      }`}
+                    />
                     <div className="min-w-0">
-                      <p className="text-neon-cyan text-xs font-bold">
+                      <p
+                        className={`text-xs font-bold ${
+                          isPerfumeTheme ? "text-[#5B0A1E]" : "text-[#0057FF]"
+                        }`}
+                      >
                         Seleccionar ubicación personalizada
                       </p>
                       {(address.trim() || coordinates) && (
-                        <p className="text-white/60 text-[11px] truncate">
+                        <p
+                          className={`text-[11px] truncate ${
+                            isPerfumeTheme
+                              ? "text-[#6B4A52]"
+                              : "text-[#4D607D]"
+                          }`}
+                        >
                           {address.trim() || "Ubicación GPS seleccionada"}
                         </p>
                       )}
                     </div>
                   </div>
                   {showCustomLocation ? (
-                    <ChevronUp className="w-4 h-4 text-neon-cyan/70 shrink-0" />
+                    <ChevronUp
+                      className={`w-4 h-4 shrink-0 ${
+                        isPerfumeTheme ? "text-[#7A102B]" : "text-[#0057FF]"
+                      }`}
+                    />
                   ) : (
-                    <ChevronDown className="w-4 h-4 text-neon-cyan/70 shrink-0" />
+                    <ChevronDown
+                      className={`w-4 h-4 shrink-0 ${
+                        isPerfumeTheme ? "text-[#7A102B]" : "text-[#0057FF]"
+                      }`}
+                    />
                   )}
                 </button>
 
                 {showCustomLocation && (
-                  <div className="px-4 pb-4 pt-2 border-t border-neon-cyan/10 space-y-3">
+                  <div
+                    className={`px-4 pb-4 pt-2 border-t space-y-3 ${
+                      isPerfumeTheme
+                        ? "border-[#F0E2DD]"
+                        : "border-[#E7EFFC]"
+                    }`}
+                  >
                     <div>
-                      <label className="text-neon-cyan/80 text-[10px] font-bold uppercase tracking-wider mb-1.5 block">
+                      <label
+                        className={`text-[10px] font-bold uppercase tracking-wider mb-1.5 block ${
+                          isPerfumeTheme
+                            ? "text-[#7A102B]"
+                            : "text-[#0057FF]"
+                        }`}
+                      >
                         Tu dirección o punto de referencia
                       </label>
                       <input
@@ -460,7 +714,11 @@ export default function CartDrawer() {
                           }
                         }}
                         placeholder="Ej: Col. Escalón, Calle El Pedregal #12"
-                        className="w-full bg-dark-800 border border-neon-cyan/20 rounded-xl px-3.5 py-2.5 text-white placeholder-white/30 text-xs focus:outline-none focus:border-neon-cyan/50 transition-colors"
+                        className={`w-full border rounded-xl px-3.5 py-2.5 text-xs focus:outline-none transition-colors ${
+                          isPerfumeTheme
+                            ? "bg-[#FDF9F8] border-[#DFC5BC] text-[#3B0815] placeholder-[#A88B92] focus:border-[#5B0A1E]"
+                            : "bg-[#F8FAFF] border-[#CFE0FA] text-[#0B172A] placeholder-[#7A8CA8] focus:border-[#0057FF]"
+                        }`}
                       />
                     </div>
 
@@ -468,7 +726,11 @@ export default function CartDrawer() {
                       <button
                         type="button"
                         onClick={handleSearchAddress}
-                        className="flex items-center justify-center gap-1.5 bg-neon-cyan/15 border border-neon-cyan/40 hover:bg-neon-cyan/25 text-neon-cyan rounded-xl py-2.5 px-3 text-xs font-bold transition-all"
+                        className={`flex items-center justify-center gap-1.5 border rounded-xl py-2.5 px-3 text-xs font-bold transition-all ${
+                          isPerfumeTheme
+                            ? "bg-[#FAF0EC] border-[#C9A89D] hover:bg-[#F3DFD8] text-[#5B0A1E]"
+                            : "bg-[#EAF2FF] border-[#BFD7FF] hover:bg-[#DCEAFF] text-[#0057FF]"
+                        }`}
                       >
                         <Search className="w-3.5 h-3.5" />
                         Buscar mi dirección
@@ -478,7 +740,11 @@ export default function CartDrawer() {
                         type="button"
                         onClick={handleUseLocation}
                         disabled={locating}
-                        className="flex items-center justify-center gap-1.5 bg-dark-800 border border-neon-cyan/25 hover:border-neon-cyan/60 text-white/80 hover:text-neon-cyan rounded-xl py-2.5 px-3 text-xs font-semibold transition-all disabled:opacity-50"
+                        className={`flex items-center justify-center gap-1.5 border rounded-xl py-2.5 px-3 text-xs font-semibold transition-all disabled:opacity-50 ${
+                          isPerfumeTheme
+                            ? "bg-white border-[#DFC5BC] hover:border-[#5B0A1E] text-[#4D0819]"
+                            : "bg-white border-[#CFE0FA] hover:border-[#0057FF] text-[#0B172A] hover:text-[#0057FF]"
+                        }`}
                       >
                         <Navigation
                           className={`w-3.5 h-3.5 ${
@@ -490,7 +756,7 @@ export default function CartDrawer() {
                     </div>
 
                     {geoError && (
-                      <p className="text-orange-400 text-[11px] text-center">
+                      <p className="text-[11px] text-center text-amber-700 font-medium">
                         {geoError}
                       </p>
                     )}
@@ -509,11 +775,19 @@ export default function CartDrawer() {
                           }
                           target="_blank"
                           rel="noopener noreferrer"
-                          className="font-semibold text-neon-cyan hover:underline"
+                          className={`font-semibold hover:underline ${
+                            isPerfumeTheme ? "text-[#5B0A1E]" : "text-[#0057FF]"
+                          }`}
                         >
                           Google Maps ↗
                         </a>
-                        <span className="text-white/20">·</span>
+                        <span
+                          className={
+                            isPerfumeTheme ? "text-[#C9A89D]" : "text-[#C0D1EC]"
+                          }
+                        >
+                          ·
+                        </span>
                         <a
                           href={
                             coordinates
@@ -526,14 +800,22 @@ export default function CartDrawer() {
                           }
                           target="_blank"
                           rel="noopener noreferrer"
-                          className="font-semibold text-neon-cyan hover:underline"
+                          className={`font-semibold hover:underline ${
+                            isPerfumeTheme ? "text-[#5B0A1E]" : "text-[#0057FF]"
+                          }`}
                         >
                           Waze ↗
                         </a>
                       </div>
                     )}
 
-                    <div className="rounded-xl overflow-hidden border border-neon-cyan/20 h-44 bg-dark-900">
+                    <div
+                      className={`rounded-xl overflow-hidden border h-44 ${
+                        isPerfumeTheme
+                          ? "border-[#E5CEC6] bg-[#FAF0EC]"
+                          : "border-[#DCE7F8] bg-[#F4F8FF]"
+                      }`}
+                    >
                       <iframe
                         key={mapQuery}
                         title="Mapa de entrega"
@@ -551,23 +833,39 @@ export default function CartDrawer() {
             </div>
 
             {/* Footer (Single Comprar Button -> WhatsApp) */}
-            <div className="shrink-0 border-t border-neon-cyan/20 px-5 py-4 space-y-3 bg-dark-700/40">
+            <div
+              className={`shrink-0 border-t px-5 py-4 space-y-3 ${
+                isPerfumeTheme
+                  ? "border-[#E2C8BF] bg-[#FAF0EC]"
+                  : "border-[#DCE7F8] bg-white"
+              }`}
+            >
               <div className="space-y-1 px-1">
-                <div className="flex items-center justify-between text-xs text-white/55">
+                <div
+                  className={`flex items-center justify-between text-xs ${
+                    isPerfumeTheme ? "text-[#6B4A52]" : "text-[#546885]"
+                  }`}
+                >
                   <span>Subtotal</span>
                   <span>${totalPrice.toFixed(2)}</span>
                 </div>
                 <div className="flex items-center justify-between text-xs">
-                  <span className="text-white/55">
+                  <span
+                    className={
+                      isPerfumeTheme ? "text-[#6B4A52]" : "text-[#546885]"
+                    }
+                  >
                     Envío {selectedZone ? `(${selectedZone})` : ""}
                   </span>
                   <span
                     className={
                       shippingCost === 0
-                        ? "text-green-400 font-bold"
+                        ? "text-emerald-700 font-bold"
                         : shippingCost !== null
-                          ? "text-orange-400 font-bold"
-                          : "text-white/40"
+                          ? "text-amber-700 font-bold"
+                          : isPerfumeTheme
+                            ? "text-[#9A7A82]"
+                            : "text-[#7A8CA8]"
                     }
                   >
                     {shippingCost === 0
@@ -579,11 +877,25 @@ export default function CartDrawer() {
                           : "Selecciona zona"}
                   </span>
                 </div>
-                <div className="flex items-center justify-between pt-1 border-t border-white/10">
-                  <span className="text-white/80 text-sm font-semibold">
+                <div
+                  className={`flex items-center justify-between pt-1 border-t ${
+                    isPerfumeTheme ? "border-[#DFC5BC]" : "border-[#E7EFFC]"
+                  }`}
+                >
+                  <span
+                    className={`text-sm font-semibold ${
+                      isPerfumeTheme ? "text-[#4D0819]" : "text-[#0B172A]"
+                    }`}
+                  >
                     Total
                   </span>
-                  <span className="font-orbitron font-black text-xl text-neon-cyan glow-text">
+                  <span
+                    className={
+                      isPerfumeTheme
+                        ? "font-playfair font-bold text-2xl text-[#4D0819]"
+                        : "font-montserrat font-black text-2xl text-[#0057FF]"
+                    }
+                  >
                     ${totalWithShipping.toFixed(2)}
                   </span>
                 </div>
@@ -595,7 +907,11 @@ export default function CartDrawer() {
                   target="_blank"
                   rel="noopener noreferrer"
                   onClick={closeCart}
-                  className="btn-neon w-full flex items-center justify-center gap-2 py-3.5 text-sm"
+                  className={
+                    isPerfumeTheme
+                      ? "w-full flex items-center justify-center gap-2 py-3.5 text-sm font-bold uppercase tracking-wider rounded-xl bg-[#5B0A1E] hover:bg-[#7A102B] text-[#FFF8F6] shadow-[0_8px_22px_rgba(91,10,30,0.22)] transition-colors"
+                      : "btn-gotech w-full flex items-center justify-center gap-2 py-3.5 text-sm"
+                  }
                 >
                   <MessageCircle className="w-4 h-4" />
                   Comprar
@@ -604,7 +920,11 @@ export default function CartDrawer() {
                 <button
                   type="button"
                   onClick={handleMissingSelection}
-                  className="btn-neon w-full flex items-center justify-center gap-2 py-3.5 text-sm"
+                  className={
+                    isPerfumeTheme
+                      ? "w-full flex items-center justify-center gap-2 py-3.5 text-sm font-bold uppercase tracking-wider rounded-xl bg-[#5B0A1E] hover:bg-[#7A102B] text-[#FFF8F6] shadow-[0_8px_22px_rgba(91,10,30,0.22)] transition-colors"
+                      : "btn-gotech w-full flex items-center justify-center gap-2 py-3.5 text-sm"
+                  }
                 >
                   <MessageCircle className="w-4 h-4" />
                   Comprar
@@ -613,7 +933,11 @@ export default function CartDrawer() {
 
               <button
                 onClick={clearCart}
-                className="w-full text-white/30 hover:text-red-400 text-xs font-semibold transition-colors py-1"
+                className={`w-full text-xs font-semibold transition-colors py-1 ${
+                  isPerfumeTheme
+                    ? "text-[#8E6971] hover:text-red-700"
+                    : "text-[#7A8CA8] hover:text-red-600"
+                }`}
               >
                 Vaciar carrito
               </button>

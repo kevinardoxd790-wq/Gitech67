@@ -4,25 +4,25 @@
 
 @layer base {
   :root {
-    --background: 210 100% 6%;
-    --foreground: 0 0% 100%;
-    --card: 212 68% 12%;
-    --card-foreground: 0 0% 100%;
-    --popover: 212 68% 10%;
-    --popover-foreground: 0 0% 100%;
-    --primary: 196 100% 50%;
-    --primary-foreground: 210 100% 6%;
-    --secondary: 212 68% 16%;
-    --secondary-foreground: 0 0% 100%;
-    --muted: 212 50% 14%;
-    --muted-foreground: 210 30% 65%;
-    --accent: 210 100% 50%;
+    --background: 216 100% 98%;
+    --foreground: 217 59% 10%;
+    --card: 0 0% 100%;
+    --card-foreground: 217 59% 10%;
+    --popover: 0 0% 100%;
+    --popover-foreground: 217 59% 10%;
+    --primary: 219 100% 50%;
+    --primary-foreground: 0 0% 100%;
+    --secondary: 216 100% 96%;
+    --secondary-foreground: 217 59% 10%;
+    --muted: 216 45% 94%;
+    --muted-foreground: 215 24% 40%;
+    --accent: 204 100% 50%;
     --accent-foreground: 0 0% 100%;
     --destructive: 0 85% 55%;
     --destructive-foreground: 0 0% 100%;
-    --border: 212 50% 20%;
-    --input: 212 50% 16%;
-    --ring: 196 100% 50%;
+    --border: 216 62% 89%;
+    --input: 216 62% 89%;
+    --ring: 219 100% 50%;
     --radius: 0.75rem;
   }
 }
@@ -32,8 +32,8 @@
     box-sizing: border-box;
   }
   body {
-    @apply bg-dark-900 text-white font-montserrat;
-    background-color: #000000;
+    @apply font-montserrat text-[#0B172A] antialiased;
+    background-color: #F4F8FF;
   }
   html {
     scroll-behavior: smooth;
@@ -41,9 +41,51 @@
 }
 
 @layer components {
+  /* Light Electric Cobalt GoTech Storefront Theme */
+  .bg-gotech-canvas {
+    background-color: #F4F8FF;
+    background-image:
+      linear-gradient(128deg, rgba(255, 255, 255, 0.92) 0%, rgba(235, 244, 255, 0.7) 48%, rgba(247, 250, 255, 0.96) 100%),
+      radial-gradient(circle at 88% 12%, rgba(0, 102, 255, 0.11), transparent 36%),
+      radial-gradient(circle at 12% 80%, rgba(0, 166, 255, 0.08), transparent 34%);
+  }
+
+  .card-gotech {
+    @apply bg-white border border-[#DCE7F8] rounded-2xl
+           shadow-[0_10px_28px_rgba(0,68,180,0.08)]
+           hover:border-[#0066FF]/45 hover:shadow-[0_16px_38px_rgba(0,68,180,0.14)]
+           transition-all duration-300;
+  }
+
+  .btn-gotech {
+    background: linear-gradient(90deg, #00349A 0%, #0057FF 55%, #0095FF 100%);
+    @apply text-white font-bold rounded-full px-6 py-3
+           shadow-[0_8px_22px_rgba(0,87,255,0.28)]
+           hover:shadow-[0_12px_28px_rgba(0,87,255,0.42)] hover:brightness-105
+           active:scale-95 transition-all duration-200 cursor-pointer border-0 text-sm tracking-wide;
+  }
+
+  .btn-gotech-outline {
+    @apply border-2 border-[#0057FF] text-[#0057FF] bg-white font-bold rounded-full px-6 py-3
+           hover:bg-[#0057FF] hover:text-white
+           shadow-[0_4px_14px_rgba(0,87,255,0.10)]
+           active:scale-95 transition-all duration-200 cursor-pointer text-sm tracking-wide;
+  }
+
+  .badge-gotech {
+    @apply inline-flex items-center gap-1.5 bg-[#EAF2FF] border border-[#BFD7FF] text-[#0057FF]
+           text-xs font-bold px-3 py-1 rounded-full uppercase tracking-wider;
+  }
+
+  .gotech-divider {
+    height: 1px;
+    background: linear-gradient(90deg, transparent, rgba(0, 87, 255, 0.25), transparent);
+  }
+
+  /* Legacy Dark / KNAS Admin Theme (preserved intact for /admin) */
   .btn-neon {
-    @apply bg-btn-gradient text-dark-900 font-bold rounded-xl px-6 py-3 
-           transition-all duration-300 hover:shadow-neon-lg hover:scale-105 
+    @apply bg-btn-gradient text-dark-900 font-bold rounded-xl px-6 py-3
+           transition-all duration-300 hover:shadow-neon-lg hover:scale-105
            active:scale-95 cursor-pointer border-0 text-sm uppercase tracking-wider;
   }
 
@@ -70,7 +112,7 @@
   }
 
   .badge-neon {
-    @apply bg-neon-cyan/10 border border-neon-cyan/40 text-neon-cyan 
+    @apply bg-neon-cyan/10 border border-neon-cyan/40 text-neon-cyan
            text-xs font-bold px-3 py-1 rounded-full uppercase tracking-wider;
   }
 }
@@ -80,24 +122,24 @@
   width: 6px;
 }
 ::-webkit-scrollbar-track {
-  background: #050D1A;
+  background: #EAF2FF;
 }
 ::-webkit-scrollbar-thumb {
-  background: #00CFFF40;
+  background: rgba(0, 87, 255, 0.28);
   border-radius: 3px;
 }
 ::-webkit-scrollbar-thumb:hover {
-  background: #00CFFF80;
+  background: rgba(0, 87, 255, 0.55);
 }
 
-/* Neon line divider */
+/* Neon line divider (used inside KNAS admin) */
 .neon-divider {
   height: 1px;
   background: linear-gradient(90deg, transparent, #00CFFF, transparent);
   opacity: 0.5;
 }
 
-/* Seamless PNG logo integration */
+/* Seamless PNG logo integration on dark surfaces */
 .brand-logo-mask-compact {
   mix-blend-mode: screen;
   filter: contrast(1.22) brightness(1.08) drop-shadow(0 0 12px rgba(0, 207, 255, 0.35));
@@ -116,4 +158,25 @@
   filter: contrast(1.18) brightness(1.06) drop-shadow(0 0 28px rgba(0, 207, 255, 0.38));
   -webkit-mask-image: radial-gradient(ellipse 96% 90% at 50% 50%, #000 68%, transparent 100%);
   mask-image: radial-gradient(ellipse 96% 90% at 50% 50%, #000 68%, transparent 100%);
+}
+
+@keyframes perfumeFloat {
+  0%, 100% {
+    transform: translate3d(0, 0px, 0);
+  }
+  50% {
+    transform: translate3d(0, -7px, 0);
+  }
+}
+
+.perfume-float-letter {
+  display: inline-block;
+  will-change: transform, opacity;
+  animation: perfumeFloat 4.2s ease-in-out infinite;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .perfume-float-letter {
+    animation: none;
+  }
 }

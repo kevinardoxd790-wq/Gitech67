@@ -188,6 +188,7 @@ export function CatalogProvider({ children }: { children: ReactNode }) {
     ).map((base) => {
       const ov = productOverrides[base.id];
       if (!ov) return base;
+      const resolvedStock = typeof ov.stock === "number" ? ov.stock : base.stock;
       return {
         ...base,
         name: ov.name,
@@ -195,7 +196,8 @@ export function CatalogProvider({ children }: { children: ReactNode }) {
         image: ov.image,
         price: ov.price,
         category: ov.category ? ov.category : base.category,
-        stock: typeof ov.stock === "number" ? ov.stock : base.stock,
+        stock: resolvedStock,
+        available: resolvedStock > 0,
         badge: ov.badge !== undefined ? ov.badge : base.badge,
       };
     });
@@ -213,6 +215,7 @@ export function CatalogProvider({ children }: { children: ReactNode }) {
     ).map((base) => {
       const ov = productOverrides[base.id];
       if (!ov) return base;
+      const resolvedStock = typeof ov.stock === "number" ? ov.stock : base.stock;
       return {
         ...base,
         name: ov.name,
@@ -220,7 +223,8 @@ export function CatalogProvider({ children }: { children: ReactNode }) {
         image: ov.image,
         price: ov.price,
         category: ov.category ? ov.category : base.category,
-        stock: typeof ov.stock === "number" ? ov.stock : base.stock,
+        stock: resolvedStock,
+        available: resolvedStock > 0,
         badge: ov.badge !== undefined ? ov.badge : base.badge,
       };
     });

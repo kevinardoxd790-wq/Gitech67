@@ -13,6 +13,7 @@ export default {
       fontFamily: {
         montserrat: ["Montserrat", "sans-serif"],
         orbitron: ["Orbitron", "sans-serif"],
+        playfair: ["Playfair Display", "Georgia", "serif"],
       },
       colors: {
         neon: {

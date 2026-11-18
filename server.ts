@@ -103,7 +103,8 @@ async function startServer() {
             typeof p.description === "string" && p.description.trim()
               ? ` | ${p.description.trim().slice(0, 70)}`
               : "";
-          return `${p.index}. [${p.id}] ${p.name} — $${Number(p.price).toFixed(2)} (stock: ${p.stock}, ${p.category})${desc}`;
+          const availability = p.stock > 0 ? "Disponible" : "Agotado";
+          return `${p.index}. [${p.id}] ${p.name} — $${Number(p.price).toFixed(2)} (${availability}, ${p.category})${desc}`;
         })
         .join("\n");
 
@@ -111,7 +112,8 @@ async function startServer() {
 Responde en español claro, directo y amable (máximo 3 oraciones).
 
 LÍMITE ESTRICTO DE TEMAS:
-- Atiende SOLO consultas sobre catálogo GoTech, precios, stock, envíos en San Salvador, carrito y soporte/problemas o reembolsos de compras GoTech.
+- Atiende SOLO consultas sobre catálogo GoTech, precios, disponibilidad, envíos en San Salvador, carrito y soporte/problemas o reembolsos de compras GoTech.
+- NUNCA menciones cantidades numéricas de existencias o stock al cliente; solo indica si está Disponible o Agotado.
 - PROHIBIDO responder historia (ej. Cristóbal Colón), geografía, tareas escolares, ciencia o cultura general. Para temas ajenos, declina cortésmente y devuelve "acciones": [].
 
 PRECIOS FIJOS (SIN CUPONES NI DESCUENTOS):

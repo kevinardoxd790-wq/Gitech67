@@ -195,7 +195,88 @@ export const PRODUCTS: Product[] = [
     available: true,
     category: "Controles",
   },
+  {
+    id: "perfume-fairyland-femme",
+    name: "Perfume Fairyland Para Mujer (60 ml)",
+    shortName: "Fairyland 60 ml",
+    price: 7.00,
+    stock: 8,
+    image: "/assets/aistudio/file_00000000b81c81f5ac262cc0e2b2b1d7_4f8b72dd.png",
+    badge: "🌸 MUJER · 60 ML",
+    description: "Eau de Toilette Fairyland Para Mujer 60 ml (2 FL. OZ.). Aroma femenino encantador y fragancia de larga duración con calidad garantizada.",
+    features: [
+      "Aroma femenino dulce y envolvente",
+      "Fragancia de larga duración",
+      "Eau de Toilette Spray — 60 ml / 2 FL. OZ.",
+      "Calidad garantizada en caja sellada",
+    ],
+    available: true,
+    category: "Perfumes Mujer",
+  },
+  {
+    id: "perfume-205-femme",
+    name: "Perfume 205 Pour Femme Byoutfull (60 ml)",
+    shortName: "205 Pour Femme 60 ml",
+    price: 7.00,
+    stock: 8,
+    image: "/assets/aistudio/file_000000002ffc81f5b12355e82b4ad7c6_0940f529.png",
+    badge: "🌸 MUJER · 60 ML",
+    description: "Eau de Toilette Spray 205 Pour Femme Byoutfull 60 ml (2 FL. OZ.). Elegancia en cada detalle con aroma femenino y floral de larga duración.",
+    features: [
+      "Aroma femenino y floral elegante",
+      "Fragancia de larga duración",
+      "Eau de Toilette Spray — 60 ml / 2 FL. OZ.",
+      "Calidad garantizada",
+    ],
+    available: true,
+    category: "Perfumes Mujer",
+  },
+  {
+    id: "perfume-221-femme",
+    name: "Perfume 221 Pour Femme Byoutfull (60 ml)",
+    shortName: "221 Pour Femme 60 ml",
+    price: 7.00,
+    stock: 8,
+    image: "/assets/aistudio/file_000000001ebc81f5aa11ed2d685b209a_f969dd83.png",
+    badge: "🌸 MUJER · 60 ML",
+    description: "Eau de Toilette Spray 221 Pour Femme Byoutfull 60 ml (2 FL. OZ.). Elegancia en cada detalle con aroma femenino y floral seductor de larga duración.",
+    features: [
+      "Aroma femenino y floral sofisticado",
+      "Fragancia de larga duración",
+      "Eau de Toilette Spray — 60 ml / 2 FL. OZ.",
+      "Calidad garantizada",
+    ],
+    available: true,
+    category: "Perfumes Mujer",
+  },
+  {
+    id: "perfume-michael-jordan-homme",
+    name: "Perfume Michael Jordan Pour Homme (60 ml)",
+    shortName: "Michael Jordan 60 ml",
+    price: 7.00,
+    stock: 8,
+    image: "/assets/aistudio/file_00000000d78481f588739b41a880bcf4_602d02f8.png",
+    badge: "🖤 HOMBRE · 60 ML",
+    description: "Eau de Toilette Spray Michael Jordan Pour Homme (MBJ) 60 ml (2 FL. OZ.). Carácter, fuerza y distinción en una fragancia duradera ideal para el hombre moderno.",
+    features: [
+      "Carácter, fuerza y distinción",
+      "Fragancia duradera ideal para el hombre moderno",
+      "Eau de Toilette Spray — 60 ml / 2 FL. OZ.",
+      "Calidad garantizada",
+    ],
+    available: true,
+    category: "Perfumes Hombre",
+  },
 ];
+
+export function isPerfumeProduct(
+  product?: { category?: string; id?: string } | null
+): boolean {
+  if (!product) return false;
+  const cat = (product.category ?? "").toLowerCase();
+  const id = (product.id ?? "").toLowerCase();
+  return cat.includes("perfume") || id.startsWith("perfume-");
+}
 
 export function getDiscountedPrice(product: Product, dynamicDiscount?: number): number {
   const d = dynamicDiscount ?? (product.discount ?? 0);
