@@ -1,4 +1,5 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
+import { useSearchParams } from "react-router-dom";
 import { Search, Filter } from "lucide-react";
 import { useCatalog } from "@/hooks/useCatalog";
 import ProductCard from "@/components/features/ProductCard";
@@ -18,8 +19,14 @@ const BASE_CATEGORIES = [
 export default function Catalog() {
   const { products: ALL_PRODUCTS } = useCatalog();
   const PRODUCTS = ALL_PRODUCTS.filter((p) => !isPerfumeProduct(p));
-  const [search, setSearch] = useState("");
+  const [searchParams, setSearchParams] = useSearchParams();
+  const urlQuery = searchParams.get("q") || "";
+  const [search, setSearch] = useState(urlQuery);
   const [activeCategory, setActiveCategory] = useState("Todos");
+
+  useEffect(() => {
+    setSearch(urlQuery);
+  }, [urlQuery]);
 
   const categories = Array.from(
     new Set([
@@ -72,7 +79,15 @@ export default function Catalog() {
               type="text"
               placeholder="Buscar producto..."
               value={search}
-              onChange={(e) => setSearch(e.target.value)}
+              onChange={(e) => {
+                const next = e.target.value;
+                setSearch(next);
+                if (next.trim()) {
+                  setSearchParams({ q: next }, { replace: true });
+                } else {
+                  setSearchParams({}, { replace: true });
+                }
+              }}
               className="w-full bg-white border border-[#CFE0FA] rounded-xl pl-10 pr-4 py-3 text-[#0B172A] placeholder-[#7A8CA8] text-sm focus:outline-none focus:border-[#0057FF] shadow-[0_4px_14px_rgba(0,68,180,0.05)] transition-colors"
             />
           </div>
