@@ -1,3 +1,4 @@
+import { useLayoutEffect } from "react";
 import { useParams, Link } from "react-router-dom";
 import {
   CheckCircle,
@@ -11,12 +12,19 @@ import { useCatalog } from "@/hooks/useCatalog";
 import { useCart } from "@/hooks/useCart";
 import GotechBackdrop from "@/components/GotechBackdrop";
 import { isPerfumeProduct } from "@/constants/products";
+import { getPerfumeCardPalette } from "@/constants/perfumePalettes";
 
 export default function ProductDetail() {
   const { id } = useParams<{ id: string }>();
   const { products: PRODUCTS } = useCatalog();
   const product = PRODUCTS.find((p) => p.id === id);
   const { addToCart, items, openCart } = useCart();
+
+  useLayoutEffect(() => {
+    window.scrollTo(0, 0);
+    document.documentElement.scrollTop = 0;
+    document.body.scrollTop = 0;
+  }, [id]);
 
   if (!product) {
     return (
@@ -39,34 +47,51 @@ export default function ProductDetail() {
   const inCart = items.find((i) => i.product.id === product.id);
   const fixedPrice = Number(product.price);
 
-  const otherProducts = PRODUCTS.filter(
-    (p) => p.id !== product.id && isPerfumeProduct(p) === isPerfume
-  ).slice(0, 2);
+  const otherProducts = PRODUCTS.filter((p) => {
+    if (p.id === product.id || isPerfumeProduct(p) !== isPerfume) return false;
+    if (isPerfume) {
+      const currentIsHombre = product.category.toLowerCase().includes("hombre");
+      const candidateIsHombre = p.category.toLowerCase().includes("hombre");
+      return currentIsHombre === candidateIsHombre;
+    }
+    return true;
+  }).slice(0, 2);
 
   if (isPerfume) {
     const isHombre = product.category.toLowerCase().includes("hombre");
+    const isMujer = !isHombre;
+    const palette = getPerfumeCardPalette(product.id, isMujer);
+
     return (
-      <div className="pt-16 min-h-screen bg-gradient-to-b from-[#FAF0EC] via-[#FDF8F6] to-[#F4E4DF] text-[#3B0815]">
+      <div
+        className={`pt-16 min-h-screen transition-colors duration-700 ${palette.detailPageBg}`}
+      >
         <div className="max-w-6xl mx-auto px-4 lg:px-8 py-10">
           {/* Back */}
           <Link
             to="/perfumes"
-            className="inline-flex items-center gap-1.5 text-[#7A102B] hover:text-[#4D0819] text-xs font-bold uppercase tracking-widest mb-8 transition-colors"
+            className={`font-playfair inline-flex items-center gap-1.5 text-xs font-bold uppercase tracking-widest mb-8 transition-colors ${palette.detailBackLink}`}
           >
             <ChevronLeft className="w-4 h-4" /> Volver a Perfumes
           </Link>
 
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-10 lg:gap-14 items-start">
             {/* Image */}
-            <div className="bg-white border border-[#E5CEC6] rounded-2xl overflow-hidden shadow-[0_18px_45px_rgba(77,8,25,0.1)]">
-              <div className="aspect-square flex items-center justify-center bg-[#FAF2EF] relative">
+            <div
+              className={`bg-white border rounded-2xl overflow-hidden transition-all duration-700 ${palette.detailBorder} ${palette.detailShadow}`}
+            >
+              <div
+                className={`aspect-square flex items-center justify-center relative transition-colors duration-700 ${palette.imageBg}`}
+              >
                 <img
                   src={product.image}
                   alt={product.name}
                   className="w-full h-full object-cover"
                 />
                 {product.stock === 0 && (
-                  <div className="absolute inset-0 bg-[#3B0815]/60 flex items-center justify-center">
+                  <div
+                    className={`absolute inset-0 flex items-center justify-center ${palette.overlayBg}`}
+                  >
                     <span className="text-white font-playfair font-bold text-2xl uppercase tracking-wider">
                       Agotado
                     </span>
@@ -77,7 +102,9 @@ export default function ProductDetail() {
 
             {/* Info */}
             <div className="flex flex-col">
-              <div className="flex items-center gap-2 text-xs font-bold uppercase tracking-[0.18em] text-[#8B1A35] mb-2">
+              <div
+                className={`font-cinzel flex items-center gap-2 text-xs font-bold uppercase tracking-[0.18em] mb-2 transition-colors duration-700 ${palette.eyebrow}`}
+              >
                 <span>
                   {isHombre ? "Fragancia para Hombre" : "Fragancia para Mujer"}
                 </span>
@@ -85,24 +112,36 @@ export default function ProductDetail() {
                 <span>Eau de Toilette 60 ml</span>
               </div>
 
-              <h1 className="font-playfair font-bold text-3xl md:text-4xl text-[#4D0819] mb-4 leading-tight">
+              <h1
+                className={`font-playfair font-bold text-3xl md:text-4xl mb-4 leading-tight transition-colors duration-700 ${palette.price}`}
+              >
                 {product.name}
               </h1>
 
-              <p className="text-[#5E3A43] text-base leading-relaxed mb-6">
+              <p
+                className={`font-cormorant text-xl font-medium leading-relaxed mb-6 transition-colors duration-700 ${palette.description}`}
+              >
                 {product.description}
               </p>
 
               {/* Features */}
-              <div className="bg-white/90 border border-[#E5CEC6] rounded-2xl p-6 mb-6">
-                <p className="text-[#8B1A35] text-xs font-bold uppercase tracking-widest mb-4">
+              <div
+                className={`border rounded-2xl p-6 mb-6 transition-colors duration-700 ${palette.detailBoxBg} ${palette.detailBorder}`}
+              >
+                <p
+                  className={`font-cinzel text-xs font-bold uppercase tracking-widest mb-4 ${palette.eyebrow}`}
+                >
                   Notas y detalles
                 </p>
                 <ul className="space-y-3">
                   {product.features.map((f, i) => (
                     <li key={i} className="flex items-start gap-3">
-                      <CheckCircle className="w-4 h-4 text-[#7A102B] shrink-0 mt-0.5" />
-                      <span className="text-[#4B232D] text-sm">{f}</span>
+                      <CheckCircle
+                        className={`w-4 h-4 shrink-0 mt-0.5 ${palette.eyebrow}`}
+                      />
+                      <span className={`text-sm ${palette.detailFeatureText}`}>
+                        {f}
+                      </span>
                     </li>
                   ))}
                 </ul>
@@ -110,10 +149,14 @@ export default function ProductDetail() {
 
               {/* Price */}
               <div className="flex items-baseline gap-3 mb-2">
-                <span className="font-playfair font-bold text-4xl text-[#4D0819]">
+                <span
+                  className={`font-playfair font-bold text-4xl transition-colors duration-700 ${palette.price}`}
+                >
                   ${fixedPrice.toFixed(2)}
                 </span>
-                <span className="text-[#8E6971] text-sm font-medium">USD</span>
+                <span className={`text-sm font-medium ${palette.detailMuted}`}>
+                  USD
+                </span>
               </div>
 
               {/* Availability (exact stock hidden from customers) */}
@@ -123,16 +166,18 @@ export default function ProductDetail() {
                     Agotado por el momento
                   </span>
                 ) : (
-                  <span className="text-emerald-800 text-sm font-semibold">
+                  <span className={`text-sm font-semibold ${palette.availableText}`}>
                     Disponible para entrega hoy
                   </span>
                 )}
               </div>
 
               {/* Delivery */}
-              <div className="flex items-center gap-2 text-emerald-800 text-sm font-semibold mb-6">
+              <div
+                className={`flex items-center gap-2 text-sm font-semibold mb-6 ${palette.shippingBadge}`}
+              >
                 <Truck className="w-4 h-4 shrink-0" />
-                Envío gratis en todas las zonas (incluye Salvador del Mundo, sin mínimo)
+                Envío rápido en San Salvador
               </div>
 
               {/* CTA */}
@@ -144,12 +189,12 @@ export default function ProductDetail() {
                   }
                 }}
                 disabled={product.stock === 0}
-                className={`w-full flex items-center justify-center gap-2 rounded-xl py-3.5 text-sm font-bold uppercase tracking-wider transition-all ${
+                className={`font-playfair w-full flex items-center justify-center gap-2 rounded-xl py-3.5 text-sm font-bold uppercase tracking-wider transition-all duration-500 ${
                   product.stock === 0
-                    ? "bg-[#E9DAD5] text-[#9A7A82] cursor-not-allowed"
+                    ? palette.detailCtaDisabled
                     : inCart
-                      ? "bg-[#F5E6E1] border-2 border-[#5B0A1E] text-[#5B0A1E] hover:bg-[#5B0A1E] hover:text-white"
-                      : "bg-[#5B0A1E] hover:bg-[#7A102B] text-[#FFF8F6] shadow-[0_10px_28px_rgba(91,10,30,0.25)]"
+                      ? palette.detailCtaInCart
+                      : palette.detailCtaDefault
                 }`}
               >
                 <ShoppingCart className="w-4 h-4" />
@@ -158,7 +203,7 @@ export default function ProductDetail() {
                   : "Agregar al carrito"}
               </button>
 
-              <p className="text-[#7D5B63] text-xs text-center mt-3">
+              <p className={`text-xs text-center mt-3 ${palette.detailMuted}`}>
                 Agrega al carrito y coordina tu entrega en San Salvador por WhatsApp
               </p>
 
@@ -166,17 +211,19 @@ export default function ProductDetail() {
               <div className="grid grid-cols-3 gap-3 mt-6">
                 {[
                   { icon: <Zap className="w-4 h-4" />, label: "Compra Rápida" },
-                  { icon: <Truck className="w-4 h-4" />, label: "Envío Gratis" },
+                  { icon: <Truck className="w-4 h-4" />, label: "Entrega Hoy" },
                   { icon: <MessageCircle className="w-4 h-4" />, label: "Atención Directa" },
                 ].map((b) => (
                   <div
                     key={b.label}
-                    className="bg-white/85 border border-[#E5CEC6] rounded-xl p-3 text-center"
+                    className={`border rounded-xl p-3 text-center transition-colors duration-700 ${palette.detailBoxBg} ${palette.detailBorder}`}
                   >
-                    <div className="text-[#7A102B] flex justify-center mb-1">
+                    <div className={`flex justify-center mb-1 ${palette.eyebrow}`}>
                       {b.icon}
                     </div>
-                    <p className="text-[#5E3A43] text-[10px] font-bold uppercase tracking-wider">
+                    <p
+                      className={`text-[10px] font-bold uppercase tracking-wider ${palette.description}`}
+                    >
                       {b.label}
                     </p>
                   </div>
@@ -187,36 +234,50 @@ export default function ProductDetail() {
 
           {/* Related perfumes */}
           {otherProducts.length > 0 && (
-            <div className="mt-16 pt-10 border-t border-[#E2C8BF]">
-              <h2 className="font-playfair font-bold text-2xl text-[#4D0819] mb-6">
+            <div className={`mt-16 pt-10 border-t ${palette.detailBorder}`}>
+              <h2
+                className={`font-playfair font-bold text-2xl mb-6 ${palette.price}`}
+              >
                 Otras fragancias que te pueden gustar
               </h2>
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
-                {otherProducts.map((p) => (
-                  <Link
-                    key={p.id}
-                    to={`/producto/${p.id}`}
-                    className="bg-white border border-[#E5CEC6] rounded-2xl p-4 flex items-center gap-4 hover:border-[#7A102B] hover:shadow-md transition-all"
-                  >
-                    <img
-                      src={p.image}
-                      alt={p.name}
-                      className="w-20 h-20 object-cover rounded-xl shrink-0 bg-[#FAF2EF]"
-                    />
-                    <div className="flex-1 min-w-0">
-                      <p className="text-[10px] font-bold uppercase tracking-wider text-[#8B1A35] mb-0.5">
-                        {p.category}
-                      </p>
-                      <p className="font-playfair font-bold text-[#3B0815] text-base mb-1 line-clamp-1">
-                        {p.name}
-                      </p>
-                      <p className="font-playfair text-[#5B0A1E] font-bold text-lg">
-                        ${Number(p.price).toFixed(2)}
-                      </p>
-                    </div>
-                    <ChevronLeft className="w-4 h-4 text-[#7A102B] rotate-180 ml-auto shrink-0" />
-                  </Link>
-                ))}
+                {otherProducts.map((p) => {
+                  const pIsMujer = !p.category.toLowerCase().includes("hombre");
+                  const pPalette = getPerfumeCardPalette(p.id, pIsMujer);
+                  return (
+                    <Link
+                      key={p.id}
+                      to={`/producto/${p.id}`}
+                      className={`border rounded-2xl p-4 flex items-center gap-4 hover:shadow-md transition-all ${pPalette.card}`}
+                    >
+                      <img
+                        src={p.image}
+                        alt={p.name}
+                        className={`w-20 h-20 object-cover rounded-xl shrink-0 ${pPalette.imageBg}`}
+                      />
+                      <div className="flex-1 min-w-0">
+                        <p
+                          className={`font-cinzel text-[10px] font-bold uppercase tracking-wider mb-0.5 ${pPalette.eyebrow}`}
+                        >
+                          {p.category}
+                        </p>
+                        <p
+                          className={`font-playfair font-bold text-base mb-1 line-clamp-1 ${pPalette.title}`}
+                        >
+                          {p.name}
+                        </p>
+                        <p
+                          className={`font-playfair font-bold text-lg ${pPalette.price}`}
+                        >
+                          ${Number(p.price).toFixed(2)}
+                        </p>
+                      </div>
+                      <ChevronLeft
+                        className={`w-4 h-4 rotate-180 ml-auto shrink-0 ${pPalette.eyebrow}`}
+                      />
+                    </Link>
+                  );
+                })}
               </div>
             </div>
           )}

@@ -29,6 +29,7 @@ interface DeliveryContextInput {
   customerAddress?: string;
   distanceKm?: number;
   withinCoverage?: boolean;
+  isFreeZone?: boolean;
   coverageStatus?: string;
   estimatedShippingUsd?: number;
 }
@@ -144,7 +145,15 @@ async function startServer() {
               `Estado de cobertura: ${rawDelivery.coverageStatus.slice(0, 120)}`
             );
           }
-          if (typeof rawDelivery.estimatedShippingUsd === "number") {
+          if (rawDelivery.isFreeZone === true) {
+            parts.push(
+              "Resultado de cobertura: PUNTO CON ENVÍO GRATIS ($0.00). Aplica envío gratis únicamente en ese punto exacto (no en cercanías)."
+            );
+          } else if (rawDelivery.withinCoverage === false) {
+            parts.push(
+              "Resultado de cobertura: Supera los 5.0 km. No se puede hacer el envío (consulta en WhatsApp)."
+            );
+          } else if (typeof rawDelivery.estimatedShippingUsd === "number") {
             const snapped = Math.max(
               1,
               Math.round((rawDelivery.estimatedShippingUsd + Number.EPSILON) * 2) / 2
@@ -153,11 +162,7 @@ async function startServer() {
               ? `$${snapped}`
               : `$${snapped.toFixed(2)}`;
             parts.push(
-              `Envío aproximado calculado: ${cleanPrice} USD${
-                rawDelivery.withinCoverage === false
-                  ? " (referencial; fuera de cobertura directa > 5 km, coordinar por WhatsApp)"
-                  : ""
-              }`
+              `Estimación de envío calculada: ${cleanPrice} USD (es una estimación y el precio final se debe acordar en WhatsApp)`
             );
           }
           if (parts.length > 0) {
@@ -191,10 +196,12 @@ CATÁLOGO REAL:
 ${catalogText || "Sin productos."}
 
 ENVÍOS Y COBERTURA:
-- Envío GRATIS para todos los productos, sin mínimo ni límite de precio, en TODAS las zonas principales: Salvador del Mundo (Gasolinera Texaco), Galerías Escalón, Torre Futura, 75 Av. Norte, Redondel Masferrer y Redondel Luceiro.
+- Envío GRATIS únicamente en estos 6 puntos exactos: Salvador del Mundo (Gasolinera Texaco), Galerías Escalón, Torre Futura, 75 Av. Norte (Gasolinera), Redondel Masferrer y Redondel Luceiro.
+- IMPORTANTE: El envío gratis aplica SOLO en el punto exacto. Si el cliente pide en cercanías o alrededores de esos puntos (ej. "cerca de Galerías", "por Torre Futura", "atrás de Masferrer", etc.), NO es gratis; aplica el cálculo por distancia.
 - Colonia Escalón: $1.50 extra.
-- Para ubicación personalizada: cobertura directa hasta 5.0 km con tarifa optimizada en montos limpios de $0.50 en $0.50 (referencia desde ~$1 o $1.50 hasta ~$3.50 USD dentro de 5 km, nunca centavos sueltos como $2.25). Si supera los 5.0 km, está fuera de cobertura directa y debe coordinarse por WhatsApp.
-- Si existe "UBICACIÓN Y COBERTURA ACTUAL DEL CLIENTE" abajo, DEBES responder indicando la ubicación del cliente, la distancia calculada en km, el estado de cobertura y el monto exacto del envío aproximado (en formato $1, $1.50, $2, $2.50, etc.). Si el cliente pregunta cuánto cuesta el envío sin indicar dirección, menciona las zonas gratis, Colonia Escalón ($1.50), el rango limpio por km dentro de 5 km ($1 a $3.50) e invítalo a escribir su colonia o dirección aquí mismo para calcularle su costo exacto.${deliveryContextBlock}
+- Para ubicación personalizada dentro de 5.0 km (que no sea punto gratis): Regla interna: nunca cotices menos de $1 USD y usa siempre montos limpios de $0.50 en $0.50 ($1, $1.50, $2, $2.50, etc., nunca centavos sueltos). PROHIBIDO mencionar al cliente que existe un mínimo de $1 o tarifa mínima; ese mínimo es solo regla interna. DEBES aclarar explícitamente que el monto mostrado es una estimación y que el precio final se debe acordar en WhatsApp.
+- Si supera los 5.0 km (withinCoverage = false): DEBES responder claramente que no se puede hacer el envío (consulta en WhatsApp), sin ofrecer precio ni estimación de envío.
+- Si existe "UBICACIÓN Y COBERTURA ACTUAL DEL CLIENTE" abajo: si indica PUNTO CON ENVÍO GRATIS, confirma que el envío es GRATIS en ese punto exacto (aclarando que cercanías no aplican); si está dentro de 5 km con costo, indica ubicación, distancia, estimación en formato limpio y aclara que es una estimación cuyo precio final se acuerda en WhatsApp (sin decir que hay mínimo de $1); si supera los 5 km, indica la distancia y responde exactamente que no se puede hacer el envío (consulta en WhatsApp). Si pregunta sin indicar dirección, menciona las zonas gratis (solo en el punto exacto), Colonia Escalón ($1.50) e invítalo a escribir su ubicación aquí.${deliveryContextBlock}
 
 FORMATO JSON OBLIGATORIO:
 { "respuesta": "...", "acciones": [...] }
@@ -440,24 +447,46 @@ FORMATO JSON OBLIGATORIO:
     }
   });
 
-  // Geocodificación segura para resolver direcciones del cliente en San Salvador
+  // Geocodificación multi-capa para resolver cualquier dirección, negocio, colonia o municipio en El Salvador
   app.get("/api/geocode", async (req, res) => {
     try {
       const rawQ = typeof req.query.q === "string" ? req.query.q.trim() : "";
       if (!rawQ) {
         return res.status(400).json({ error: "Dirección vacía" });
       }
-      const buildQuery = (text: string) =>
-        text.toLowerCase().includes("salvador")
-          ? text
-          : `${text}, San Salvador, El Salvador`;
+
+      const isInsideElSalvador = (lat: number, lng: number) =>
+        Number.isFinite(lat) &&
+        Number.isFinite(lng) &&
+        lat >= 13.0 &&
+        lat <= 14.55 &&
+        lng >= -90.25 &&
+        lng <= -87.6;
+
+      const simplifyAddress = (text: string) =>
+        text
+          .replace(/#\s*\d+[a-z0-9-]*/gi, "")
+          .replace(
+            /\b(?:casa|pasaje|psj|block|poligono|polígono|apto|apartamento|local|lote|senda)\s*[a-z0-9-]*/gi,
+            ""
+          )
+          .replace(/\s+/g, " ")
+          .trim();
+
+      const buildSvQuery = (text: string, preferSanSalvador = false) => {
+        const lower = text.toLowerCase();
+        if (lower.includes("salvador")) return text;
+        return preferSanSalvador
+          ? `${text}, San Salvador, El Salvador`
+          : `${text}, El Salvador`;
+      };
 
       const fetchNominatim = async (text: string) => {
         const controller = new AbortController();
         const timeoutId = setTimeout(() => controller.abort(), 3500);
         try {
           const nominatimUrl = `https://nominatim.openstreetmap.org/search?format=json&limit=1&countrycodes=sv&q=${encodeURIComponent(
-            buildQuery(text)
+            text
           )}`;
           const geoRes = await fetch(nominatimUrl, {
             signal: controller.signal,
@@ -471,23 +500,124 @@ FORMATO JSON OBLIGATORIO:
           if (!Array.isArray(results) || results.length === 0) return null;
           const lat = Number(results[0]?.lat);
           const lng = Number(results[0]?.lon);
-          if (!Number.isFinite(lat) || !Number.isFinite(lng)) return null;
+          if (!isInsideElSalvador(lat, lng)) return null;
           return { lat, lng };
+        } catch {
+          return null;
         } finally {
           clearTimeout(timeoutId);
         }
       };
 
-      let coords = await fetchNominatim(rawQ);
-      if (!coords) {
-        const simplified = rawQ
-          .replace(/#\s*\d+[a-z]?/gi, "")
-          .replace(/\b(?:casa|pasaje|psj|block|poligono|polígono|apto|local)\s*[a-z0-9-]*/gi, "")
-          .replace(/\s+/g, " ")
-          .trim();
-        if (simplified && simplified !== rawQ) {
-          coords = await fetchNominatim(simplified);
+      const fetchPhoton = async (text: string) => {
+        const controller = new AbortController();
+        const timeoutId = setTimeout(() => controller.abort(), 3500);
+        try {
+          const photonUrl = `https://photon.komoot.io/api/?q=${encodeURIComponent(
+            text
+          )}&limit=5&lat=13.7028&lon=-89.2367`;
+          const geoRes = await fetch(photonUrl, {
+            signal: controller.signal,
+            headers: {
+              "User-Agent": "GoTechSV-DeliveryCalc/1.0",
+              Accept: "application/json",
+            },
+          });
+          if (!geoRes.ok) return null;
+          const data = await geoRes.json();
+          const features = Array.isArray(data?.features) ? data.features : [];
+          for (const f of features) {
+            const coordsArr = f?.geometry?.coordinates;
+            if (!Array.isArray(coordsArr) || coordsArr.length < 2) continue;
+            const lng = Number(coordsArr[0]);
+            const lat = Number(coordsArr[1]);
+            if (isInsideElSalvador(lat, lng)) {
+              return { lat, lng };
+            }
+          }
+          return null;
+        } catch {
+          return null;
+        } finally {
+          clearTimeout(timeoutId);
         }
+      };
+
+      const fetchGeminiCoords = async (text: string) => {
+        const apiKey = process.env.GEMINI_API_KEY;
+        if (!apiKey) return null;
+        const controller = new AbortController();
+        const timeoutId = setTimeout(() => controller.abort(), 5500);
+        try {
+          const ai = getAiClient(apiKey);
+          const response = await ai.models.generateContent({
+            model: "gemini-3.1-flash-lite",
+            contents: [
+              {
+                role: "user",
+                parts: [
+                  {
+                    text: `Devuelve las coordenadas geográficas aproximadas en El Salvador para esta dirección, comercio, colonia, residencial o municipio: "${text.slice(
+                      0,
+                      140
+                    )}". Si pertenece al Área Metropolitana de San Salvador o al interior de El Salvador, estima su latitud y longitud reales más probables dentro de El Salvador (found=true). Si es texto totalmente sin sentido no ubicable en ningún lugar real, devuelve found=false.`,
+                  },
+                ],
+              },
+            ],
+            config: {
+              thinkingConfig: { thinkingLevel: ThinkingLevel.MINIMAL },
+              responseMimeType: "application/json",
+              abortSignal: controller.signal,
+              responseSchema: {
+                type: Type.OBJECT,
+                properties: {
+                  found: { type: Type.BOOLEAN },
+                  lat: { type: Type.NUMBER },
+                  lng: { type: Type.NUMBER },
+                },
+                required: ["found", "lat", "lng"],
+              },
+            },
+          });
+          const parsed = extractJsonObject((response.text ?? "").trim());
+          if (parsed?.found === true) {
+            const lat = Number(parsed?.lat);
+            const lng = Number(parsed?.lng);
+            if (isInsideElSalvador(lat, lng)) {
+              return { lat, lng };
+            }
+          }
+          return null;
+        } catch {
+          return null;
+        } finally {
+          clearTimeout(timeoutId);
+        }
+      };
+
+      const simplified = simplifyAddress(rawQ);
+
+      // 1. Nominatim (El Salvador general y San Salvador)
+      let coords =
+        (await fetchNominatim(buildSvQuery(rawQ, false))) ||
+        (await fetchNominatim(buildSvQuery(rawQ, true)));
+      if (!coords && simplified && simplified !== rawQ) {
+        coords =
+          (await fetchNominatim(buildSvQuery(simplified, false))) ||
+          (await fetchNominatim(buildSvQuery(simplified, true)));
+      }
+
+      // 2. Photon OSM (muy bueno para comercios, clínicas, residenciales y calles)
+      if (!coords) {
+        coords =
+          (await fetchPhoton(buildSvQuery(rawQ, true))) ||
+          (await fetchPhoton(buildSvQuery(rawQ, false)));
+      }
+
+      // 3. Gemini 3.1 Geo-Lookup (lugares, clínicas, residenciales y municipios de El Salvador)
+      if (!coords) {
+        coords = await fetchGeminiCoords(rawQ);
       }
 
       if (!coords) {
@@ -547,11 +677,13 @@ Debes calcular un desglose justo y equilibrado en USD considerando:
 3. GANANCIA SOSTENIBLE PARA LA TIENDA: Debe dejar un margen operativo positivo razonable para GoTech SV sobre el servicio de envío.
 
 REGLAS ESTRICTAS:
-- MONTO LIMPIO SIN CENTAVOS SUELTOS: "shippingPriceUsd" DEBE ser SIEMPRE un múltiplo exacto de $0.50 USD (únicamente valores como 1, 1.5, 2, 2.5, 3, 3.5, 4, etc.; PROHIBIDO usar centavos sueltos como 1.25, 1.75, 2.15 o 2.25).
+- PISO INTERNO $1 USD: "shippingPriceUsd" NUNCA puede ser menor a 1.00 USD (regla interna del sistema).
+- MONTO LIMPIO SIN CENTAVOS SUELTOS: "shippingPriceUsd" DEBE ser SIEMPRE un múltiplo exacto de $0.50 USD desde 1.00 en adelante (únicamente valores como 1, 1.5, 2, 2.5, 3, 3.5, 4, etc.; PROHIBIDO usar centavos sueltos como 1.25, 1.75, 2.15 o 2.25).
+- ESTIMACIÓN A ACORDAR EN WHATSAPP (SIN MENCIONAR MÍNIMOS): En "consumerSummary" y "pricingNote" DEBES indicar siempre que el monto calculado es una estimación y que el precio final se debe acordar en WhatsApp (tanto dentro como fuera de 5 km), pero NUNCA escribas ni reveles en esos textos que existe un mínimo de $1.
 - CERO cupones, códigos promocionales ni descuentos sobre los productos.
 - NUNCA menciones direcciones de origen ni puntos de partida de la tienda.
 - Coherencia matemática obligatoria: shippingPriceUsd = driverCompensationUsd + storeMarginUsd (todos > 0).
-- Si withinCoverage es false (> 5.0 km), calcula un estimado referencial en múltiplos de $0.50 aclarando que supera los 5 km de cobertura directa y debe coordinarse por WhatsApp.
+- Si withinCoverage es false (> 5.0 km), calcula un estimado referencial >= 1 en múltiplos de $0.50 aclarando que supera los 5 km de cobertura directa y que el precio final se acuerda en WhatsApp.
 - Responde en español breve, profesional y claro.`;
 
       const userPrompt = JSON.stringify({
@@ -664,12 +796,12 @@ REGLAS ESTRICTAS:
         typeof parsed?.consumerSummary === "string" &&
         parsed.consumerSummary.trim()
           ? parsed.consumerSummary.trim().slice(0, 180)
-          : "Tarifa optimizada por distancia con entrega rápida y pago justo al repartidor.";
+          : "Estimación calculada por distancia; el precio final se acuerda en WhatsApp.";
 
       const pricingNote =
         typeof parsed?.pricingNote === "string" && parsed.pricingNote.trim()
           ? parsed.pricingNote.trim().slice(0, 200)
-          : "Equilibra un precio accesible para el cliente, pago justo al repartidor y margen operativo.";
+          : "Estimación por distancia a confirmar y acordar por WhatsApp.";
 
       return res.json({
         shippingPriceUsd,

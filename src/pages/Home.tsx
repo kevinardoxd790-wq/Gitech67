@@ -214,10 +214,10 @@ export default function Home() {
               ))}
               <a
                 href="#perfumes"
-                className="flex flex-col items-center justify-center gap-2 bg-[#FAF0EC] hover:bg-[#F6E4DE] border border-[#E5CEC6] hover:border-[#5B0A1E] rounded-xl py-3.5 px-3 text-center transition-all duration-200 group"
+                className="flex flex-col items-center justify-center gap-2 bg-[#EDF7F2] hover:bg-[#E0F0E8] border border-[#C5DFD1] hover:border-[#0B4A31] rounded-xl py-3.5 px-3 text-center transition-all duration-200 group"
               >
-                <Sparkles className="w-6 h-6 text-[#5B0A1E]" />
-                <span className="text-xs font-bold text-[#4D0819]">
+                <Sparkles className="w-6 h-6 text-[#0B4A31]" />
+                <span className="font-playfair text-xs font-bold text-[#063020]">
                   Perfumes
                 </span>
               </a>

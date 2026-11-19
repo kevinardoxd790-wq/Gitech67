@@ -13,7 +13,9 @@ export default {
       fontFamily: {
         montserrat: ["Montserrat", "sans-serif"],
         orbitron: ["Orbitron", "sans-serif"],
-        playfair: ["Playfair Display", "Georgia", "serif"],
+        playfair: ["Playfair Display", "Cormorant Garamond", "Georgia", "serif"],
+        cinzel: ["Cinzel", "Playfair Display", "Georgia", "serif"],
+        cormorant: ["Cormorant Garamond", "Playfair Display", "Georgia", "serif"],
       },
       colors: {
         neon: {

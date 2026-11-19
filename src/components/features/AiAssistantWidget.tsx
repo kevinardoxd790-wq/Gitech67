@@ -11,7 +11,7 @@ import {
 } from "lucide-react";
 import { useCatalog } from "@/hooks/useCatalog";
 import { useCart } from "@/hooks/useCart";
-import { usePerfumeZone } from "@/hooks/usePerfumeZone";
+import { usePerfumeTheme } from "@/hooks/usePerfumeZone";
 import { ejecutarAccionesIA, AIRespuestaJSON } from "@/lib/aiExecutor";
 import { onOpenAiAssistant } from "@/lib/aiBridge";
 import {
@@ -30,6 +30,7 @@ interface DeliveryContextPayload {
   customerAddress?: string;
   distanceKm?: number;
   withinCoverage?: boolean;
+  isFreeZone?: boolean;
   coverageStatus?: string;
   estimatedShippingUsd?: number;
 }
@@ -136,31 +137,41 @@ function generarRespuestaRespaldoLocal(
     ) {
       if (
         deliveryContext?.hasLocation &&
-        typeof deliveryContext.distanceKm === "number" &&
-        typeof deliveryContext.estimatedShippingUsd === "number"
+        typeof deliveryContext.distanceKm === "number"
       ) {
         const locPart = deliveryContext.customerAddress
           ? `Para tu ubicación (${deliveryContext.customerAddress}), `
           : "Para tu ubicación seleccionada, ";
         const kmText = `${deliveryContext.distanceKm.toFixed(2)} km`;
-        const priceText = `~${formatEnvioUsd(
-          deliveryContext.estimatedShippingUsd
-        )} USD`;
-        if (deliveryContext.withinCoverage) {
+        if (deliveryContext.isFreeZone) {
           return {
-            respuesta: `${locPart}la distancia es de ${kmText}, estás dentro de cobertura (límite 5 km) y el envío calculado es de ${priceText}. Además, Salvador del Mundo (Texaco), Galerías, Torre Futura, 75 Av. Norte, Masferrer y Luceiro tienen envío gratis.`,
+            respuesta: `${locPart}¡el envío es GRATIS en ese punto exacto! Recuerda que el envío gratis aplica solo en el punto exacto, no en cercanías.`,
             acciones: [],
           };
         }
-        return {
-          respuesta: `${locPart}la distancia es de ${kmText}, supera el límite de 5 km (fuera de cobertura directa) con un estimado referencial de ${priceText}; el envío se coordina por WhatsApp.`,
-          acciones: [],
-        };
+        if (
+          deliveryContext.withinCoverage &&
+          typeof deliveryContext.estimatedShippingUsd === "number"
+        ) {
+          const priceText = `~${formatEnvioUsd(
+            deliveryContext.estimatedShippingUsd
+          )} USD`;
+          return {
+            respuesta: `${locPart}la distancia es de ${kmText}, estás dentro de cobertura (límite 5 km) y la estimación de envío es de ${priceText}. Es una estimación y el precio final se debe acordar en WhatsApp. Además, Salvador del Mundo (Texaco), Galerías, Torre Futura, 75 Av. Norte, Masferrer y Luceiro tienen envío gratis (solo en el punto exacto).`,
+            acciones: [],
+          };
+        }
+        if (deliveryContext.withinCoverage === false) {
+          return {
+            respuesta: `${locPart}la distancia es de ${kmText} y supera el límite de 5 km. No se puede hacer el envío (consulta en WhatsApp).`,
+            acciones: [],
+          };
+        }
       }
 
       return {
         respuesta:
-          "¡El envío es GRATIS en Salvador del Mundo (Texaco), Galerías Escalón, Torre Futura, 75 Av. Norte, Redondel Masferrer y Redondel Luceiro (Colonia Escalón $1.50)! Para otras zonas dentro de 5 km el envío calculado es desde ~$1 o $1.50 hasta ~$3.50 USD según distancia. Escríbeme aquí tu colonia o dirección (ej: 'envío a Metrocentro') para darte el costo exacto.",
+          "¡El envío es GRATIS en Salvador del Mundo (Texaco), Galerías Escalón, Torre Futura, 75 Av. Norte, Redondel Masferrer y Redondel Luceiro (solo en el punto exacto; cercanías no aplican)! Colonia Escalón cuesta $1.50. Para otras zonas dentro de 5 km calculamos una estimación según distancia (el precio final se acuerda en WhatsApp); si supera los 5 km, no se puede hacer el envío (consulta en WhatsApp).",
         acciones: [],
       };
     }
@@ -342,7 +353,8 @@ function summarizeExecutedActions(data: AIRespuestaJSON): string | undefined {
 
 export default function AiAssistantWidget() {
   const location = useLocation();
-  const isPerfumeTheme = usePerfumeZone();
+  const { isPerfumeZone: isPerfumeTheme, perfumeGender } = usePerfumeTheme();
+  const isPerfumeMujer = isPerfumeTheme && perfumeGender === "mujer";
   const isAdminTheme = location.pathname.startsWith("/admin");
 
   const { products } = useCatalog();
@@ -480,10 +492,14 @@ export default function AiAssistantWidget() {
         }
       }
 
-      const coverage = calcularCoberturaEnvioSeguro(targetCoords);
-      let resolvedShippingUsd = coverage?.estimatedShippingUsd;
+      const coverage = calcularCoberturaEnvioSeguro(targetCoords, targetAddress);
+      let resolvedShippingUsd = coverage?.isFreeZone
+        ? 0
+        : coverage?.withinCoverage
+          ? coverage.estimatedShippingUsd
+          : undefined;
 
-      if (coverage) {
+      if (coverage && coverage.withinCoverage && !coverage.isFreeZone) {
         const cachedQuote = getCachedAiShippingQuote(
           buildAiShippingCacheKey({
             distanceKm: coverage.distanceKm,
@@ -514,8 +530,11 @@ export default function AiAssistantWidget() {
             ? {
                 distanceKm: coverage.distanceKm,
                 withinCoverage: coverage.withinCoverage,
+                isFreeZone: Boolean(coverage.isFreeZone),
                 coverageStatus: coverage.statusLabel,
-                estimatedShippingUsd: resolvedShippingUsd,
+                ...(typeof resolvedShippingUsd === "number"
+                  ? { estimatedShippingUsd: resolvedShippingUsd }
+                  : {}),
               }
             : {}),
         };
@@ -634,17 +653,21 @@ export default function AiAssistantWidget() {
     <div className="fixed bottom-4 right-4 z-40">
       {isOpen ? (
         <div
-          className={`w-[330px] sm:w-[360px] rounded-2xl overflow-hidden flex flex-col max-h-[75vh] animate-slide-up transition-colors duration-300 border ${
+          className={`w-[330px] sm:w-[360px] rounded-2xl overflow-hidden flex flex-col max-h-[75vh] animate-slide-up transition-colors duration-500 border ${
             isPerfumeTheme
-              ? "bg-[#FDF7F5] border-[#DFC5BC] text-[#3B0815] shadow-[0_20px_50px_rgba(77,8,25,0.24)]"
+              ? isPerfumeMujer
+                ? "bg-[#FFF8FB] border-[#F0C4D7] text-[#5C0E32] shadow-[0_20px_50px_rgba(142,29,78,0.24)]"
+                : "bg-[#F7FBF9] border-[#C5DFD1] text-[#063020] shadow-[0_20px_50px_rgba(6,48,32,0.24)]"
               : "bg-white border-[#CFE0FA] text-[#0B172A] shadow-[0_20px_50px_rgba(0,68,180,0.20)]"
           }`}
         >
           {/* Header */}
           <div
-            className={`flex items-center justify-between px-4 py-3 border-b transition-colors ${
+            className={`flex items-center justify-between px-4 py-3 border-b transition-colors duration-500 ${
               isPerfumeTheme
-                ? "bg-gradient-to-r from-[#5B0A1E] to-[#7A102B] border-[#4D0819] text-[#FFF8F6]"
+                ? isPerfumeMujer
+                  ? "bg-gradient-to-r from-[#8E1D4E] to-[#C23273] border-[#6E133D] text-[#FFF8FB]"
+                  : "bg-gradient-to-r from-[#042417] to-[#0B4A31] border-[#042417] text-[#F7FBF9]"
                 : "bg-gradient-to-r from-[#00349A] via-[#0057FF] to-[#0088FF] border-[#0044CC] text-white"
             }`}
           >
@@ -652,7 +675,9 @@ export default function AiAssistantWidget() {
               <div
                 className={`w-8 h-8 rounded-xl border flex items-center justify-center ${
                   isPerfumeTheme
-                    ? "bg-[#FFF8F6]/15 border-[#FFE0D6]/40 text-[#FFE0D6]"
+                    ? isPerfumeMujer
+                      ? "bg-[#FFF8FB]/15 border-[#FFD6E7]/40 text-[#FFE2EE]"
+                      : "bg-[#F7FBF9]/15 border-[#E8CF8E]/40 text-[#EFE1B8]"
                     : "bg-white/15 border-white/30 text-white"
                 }`}
               >
@@ -662,7 +687,7 @@ export default function AiAssistantWidget() {
                 <p
                   className={`font-bold text-xs flex items-center gap-1 ${
                     isPerfumeTheme
-                      ? "font-playfair tracking-wide text-sm text-[#FFF8F6]"
+                      ? "font-playfair tracking-wide text-sm text-white"
                       : "font-montserrat text-white"
                   }`}
                 >
@@ -671,11 +696,15 @@ export default function AiAssistantWidget() {
                 </p>
                 <p
                   className={`text-[10px] ${
-                    isPerfumeTheme ? "text-[#FFE0D6]/85" : "text-white/80"
+                    isPerfumeTheme
+                      ? isPerfumeMujer
+                        ? "text-[#FFE2EE]/90"
+                        : "text-[#EFE1B8]/90"
+                      : "text-white/80"
                   }`}
                 >
                   {isPerfumeTheme
-                    ? "Perfumes · Fragancias y pedidos"
+                    ? `Perfumes ${isPerfumeMujer ? "Mujer" : "Hombre"} · Pedidos`
                     : "Respuestas rápidas · Productos y pedidos"}
                 </p>
               </div>
@@ -693,9 +722,11 @@ export default function AiAssistantWidget() {
           {/* Messages canvas */}
           <div
             ref={listRef}
-            className={`flex-1 overflow-y-auto p-3 space-y-2.5 min-h-[220px] max-h-[340px] ${
+            className={`flex-1 overflow-y-auto p-3 space-y-2.5 min-h-[220px] max-h-[340px] transition-colors duration-500 ${
               isPerfumeTheme
-                ? "bg-gradient-to-b from-[#FAF0EC] via-[#FDF8F6] to-[#F6E9E4]"
+                ? isPerfumeMujer
+                  ? "bg-gradient-to-b from-[#FFF1F6] via-[#FFF8FB] to-[#FCE4EE]"
+                  : "bg-gradient-to-b from-[#EEF7F2] via-[#F7FBF9] to-[#E2F0E9]"
                 : "bg-gradient-to-b from-[#F4F8FF] via-[#F9FBFF] to-[#EEF4FF]"
             }`}
           >
@@ -710,10 +741,14 @@ export default function AiAssistantWidget() {
                   className={`max-w-[85%] rounded-2xl px-3.5 py-2.5 text-xs leading-relaxed ${
                     msg.role === "user"
                       ? isPerfumeTheme
-                        ? "bg-[#5B0A1E] text-[#FFF8F6] font-semibold rounded-br-sm shadow-sm"
+                        ? isPerfumeMujer
+                          ? "bg-[#A62660] text-[#FFF8FB] font-semibold rounded-br-sm shadow-sm"
+                          : "bg-[#0B4A31] text-[#F7FBF9] font-semibold rounded-br-sm shadow-sm"
                         : "bg-gradient-to-r from-[#00349A] via-[#0057FF] to-[#0088FF] text-white font-semibold rounded-br-sm shadow-sm"
                       : isPerfumeTheme
-                        ? "bg-white border border-[#E5CEC6] text-[#3B0815] rounded-bl-sm shadow-sm"
+                        ? isPerfumeMujer
+                          ? "bg-white border border-[#F0C4D7] text-[#5C0E32] rounded-bl-sm shadow-sm"
+                          : "bg-white border border-[#C5DFD1] text-[#063020] rounded-bl-sm shadow-sm"
                         : "bg-white border border-[#DCE7F8] text-[#0B172A] rounded-bl-sm shadow-sm"
                   }`}
                 >
@@ -721,7 +756,11 @@ export default function AiAssistantWidget() {
                   {msg.actionNote && (
                     <span
                       className={`mt-1.5 inline-flex items-center gap-1 text-[10px] font-bold ${
-                        isPerfumeTheme ? "text-emerald-700" : "text-emerald-600"
+                        isPerfumeTheme
+                          ? isPerfumeMujer
+                            ? "text-[#A62660]"
+                            : "text-emerald-700"
+                          : "text-emerald-600"
                       }`}
                     >
                       <Check className="w-3 h-3" /> {msg.actionNote}
@@ -736,7 +775,9 @@ export default function AiAssistantWidget() {
                         onClick={() => handleAcceptWhatsApp(msg.id)}
                         className={`py-2 px-3 rounded-xl text-[11px] flex items-center justify-center gap-1.5 font-bold transition-colors ${
                           isPerfumeTheme
-                            ? "bg-[#5B0A1E] hover:bg-[#7A102B] text-[#FFF8F6]"
+                            ? isPerfumeMujer
+                              ? "bg-[#A62660] hover:bg-[#C23273] text-[#FFF8FB]"
+                              : "bg-[#0B4A31] hover:bg-[#116443] text-[#F7FBF9]"
                             : "btn-gotech text-[11px] py-2"
                         }`}
                       >
@@ -748,7 +789,9 @@ export default function AiAssistantWidget() {
                         onClick={() => handleStayInStore(msg.id)}
                         className={`w-full py-1.5 px-3 rounded-xl border text-[11px] font-semibold transition-colors ${
                           isPerfumeTheme
-                            ? "border-[#DFC5BC] text-[#5B0A1E] hover:bg-[#FAF0EC]"
+                            ? isPerfumeMujer
+                              ? "border-[#F0C4D7] text-[#A62660] hover:bg-[#FFF1F6]"
+                              : "border-[#C5DFD1] text-[#0B4A31] hover:bg-[#EEF7F2]"
                             : "border-[#CFE0FA] text-[#334663] hover:border-[#0057FF] hover:text-[#0057FF]"
                         }`}
                       >
@@ -759,7 +802,11 @@ export default function AiAssistantWidget() {
                   {msg.refundChoiceTaken === "whatsapp" && (
                     <span
                       className={`mt-1.5 inline-flex items-center gap-1 text-[10px] font-bold ${
-                        isPerfumeTheme ? "text-emerald-700" : "text-emerald-600"
+                        isPerfumeTheme
+                          ? isPerfumeMujer
+                            ? "text-[#A62660]"
+                            : "text-emerald-700"
+                          : "text-emerald-600"
                       }`}
                     >
                       <Check className="w-3 h-3" /> Abriendo WhatsApp (76299724)
@@ -773,7 +820,9 @@ export default function AiAssistantWidget() {
                 <div
                   className={`rounded-2xl px-3.5 py-2 text-xs font-semibold animate-pulse border ${
                     isPerfumeTheme
-                      ? "bg-white border-[#E5CEC6] text-[#7A102B]"
+                      ? isPerfumeMujer
+                        ? "bg-white border-[#F0C4D7] text-[#A62660]"
+                        : "bg-white border-[#C5DFD1] text-[#0B4A31]"
                       : "bg-white border-[#DCE7F8] text-[#0057FF]"
                   }`}
                 >
@@ -785,9 +834,11 @@ export default function AiAssistantWidget() {
 
           {/* Quick action bar */}
           <div
-            className={`px-3 py-2 flex gap-1.5 overflow-x-auto border-t ${
+            className={`px-3 py-2 flex gap-1.5 overflow-x-auto border-t transition-colors duration-500 ${
               isPerfumeTheme
-                ? "bg-[#FAF0EC] border-[#EAE0DC]"
+                ? isPerfumeMujer
+                  ? "bg-[#FFF1F6] border-[#F0C4D7]"
+                  : "bg-[#EEF7F2] border-[#C5DFD1]"
                 : "bg-white border-[#EAF1FC]"
             }`}
           >
@@ -803,11 +854,13 @@ export default function AiAssistantWidget() {
               }
               className={`shrink-0 text-[10px] font-semibold border px-2.5 py-1 rounded-full transition-colors disabled:opacity-40 ${
                 isPerfumeTheme
-                  ? "bg-white border-[#DFC5BC] hover:border-[#5B0A1E] text-[#5B0A1E]"
+                  ? isPerfumeMujer
+                    ? "bg-white border-[#F0C4D7] hover:border-[#A62660] text-[#A62660]"
+                    : "bg-white border-[#C5DFD1] hover:border-[#0B4A31] text-[#0B4A31]"
                   : "bg-[#F4F8FF] border-[#CFE0FA] hover:border-[#0057FF] text-[#0057FF]"
               }`}
             >
-              {isPerfumeTheme ? "🌸 Ver perfumes" : "📦 Ver catálogo"}
+              {isPerfumeTheme ? "✨ Ver perfumes" : "📦 Ver catálogo"}
             </button>
             <button
               type="button"
@@ -817,7 +870,9 @@ export default function AiAssistantWidget() {
               }
               className={`shrink-0 text-[10px] font-semibold border px-2.5 py-1 rounded-full transition-colors disabled:opacity-40 ${
                 isPerfumeTheme
-                  ? "bg-white border-[#DFC5BC] hover:border-[#5B0A1E] text-[#4D0819]"
+                  ? isPerfumeMujer
+                    ? "bg-white border-[#F0C4D7] hover:border-[#A62660] text-[#5C0E32]"
+                    : "bg-white border-[#C5DFD1] hover:border-[#0B4A31] text-[#063020]"
                   : "bg-[#F4F8FF] border-[#CFE0FA] hover:border-[#0057FF] text-[#334663]"
               }`}
             >
@@ -829,7 +884,9 @@ export default function AiAssistantWidget() {
               onClick={() => void sendMessageText("Quiero consultar por un reembolso")}
               className={`shrink-0 text-[10px] font-semibold border px-2.5 py-1 rounded-full transition-colors disabled:opacity-40 ${
                 isPerfumeTheme
-                  ? "bg-white border-[#DFC5BC] hover:border-[#5B0A1E] text-[#4D0819]"
+                  ? isPerfumeMujer
+                    ? "bg-white border-[#F0C4D7] hover:border-[#A62660] text-[#5C0E32]"
+                    : "bg-white border-[#C5DFD1] hover:border-[#0B4A31] text-[#063020]"
                   : "bg-[#F4F8FF] border-[#CFE0FA] hover:border-[#0057FF] text-[#334663]"
               }`}
             >
@@ -840,13 +897,19 @@ export default function AiAssistantWidget() {
               onClick={openCart}
               className={`shrink-0 text-[10px] font-semibold border px-2.5 py-1 rounded-full flex items-center gap-1 transition-colors ${
                 isPerfumeTheme
-                  ? "bg-white border-[#DFC5BC] hover:border-[#5B0A1E] text-[#4D0819]"
+                  ? isPerfumeMujer
+                    ? "bg-white border-[#F0C4D7] hover:border-[#A62660] text-[#5C0E32]"
+                    : "bg-white border-[#C5DFD1] hover:border-[#0B4A31] text-[#063020]"
                   : "bg-[#F4F8FF] border-[#CFE0FA] hover:border-[#0057FF] text-[#334663]"
               }`}
             >
               <ShoppingCart
                 className={`w-3 h-3 ${
-                  isPerfumeTheme ? "text-[#5B0A1E]" : "text-[#0057FF]"
+                  isPerfumeTheme
+                    ? isPerfumeMujer
+                      ? "text-[#A62660]"
+                      : "text-[#0B4A31]"
+                    : "text-[#0057FF]"
                 }`}
               />{" "}
               Ver carrito
@@ -856,9 +919,11 @@ export default function AiAssistantWidget() {
           {/* Input */}
           <form
             onSubmit={handleSend}
-            className={`p-3 border-t flex gap-2 ${
+            className={`p-3 border-t flex gap-2 transition-colors duration-500 ${
               isPerfumeTheme
-                ? "border-[#E5CEC6] bg-[#FAF0EC]"
+                ? isPerfumeMujer
+                  ? "border-[#F0C4D7] bg-[#FFF1F6]"
+                  : "border-[#C5DFD1] bg-[#EEF7F2]"
                 : "border-[#DCE7F8] bg-[#F4F8FF]"
             }`}
           >
@@ -868,13 +933,17 @@ export default function AiAssistantWidget() {
               onChange={(e) => setInput(e.target.value)}
               placeholder={
                 isPerfumeTheme
-                  ? "Ej: Agrega el perfume Fairyland..."
+                  ? isPerfumeMujer
+                    ? "Ej: Agrega el perfume Fairyland..."
+                    : "Ej: Agrega el Dior Sauvage..."
                   : "Ej: Agrega el Bluetooth 5.0..."
               }
               maxLength={300}
               className={`flex-1 bg-white border rounded-xl px-3 py-2 text-xs focus:outline-none ${
                 isPerfumeTheme
-                  ? "border-[#DFC5BC] text-[#3B0815] placeholder-[#9D7880] focus:border-[#5B0A1E]"
+                  ? isPerfumeMujer
+                    ? "border-[#F0C4D7] text-[#5C0E32] placeholder-[#B07A92] focus:border-[#A62660]"
+                    : "border-[#C5DFD1] text-[#063020] placeholder-[#6B9382] focus:border-[#0B4A31]"
                   : "border-[#CFE0FA] text-[#0B172A] placeholder-[#6B7E9E] focus:border-[#0057FF]"
               }`}
             />
@@ -883,7 +952,9 @@ export default function AiAssistantWidget() {
               disabled={loading || !input.trim()}
               className={`px-3 py-2 rounded-xl flex items-center justify-center disabled:opacity-40 transition-colors ${
                 isPerfumeTheme
-                  ? "bg-[#5B0A1E] hover:bg-[#7A102B] text-[#FFF8F6]"
+                  ? isPerfumeMujer
+                    ? "bg-[#A62660] hover:bg-[#C23273] text-[#FFF8FB]"
+                    : "bg-[#0B4A31] hover:bg-[#116443] text-[#F7FBF9]"
                   : "btn-gotech rounded-xl px-3 py-2"
               }`}
               aria-label="Enviar mensaje"
@@ -898,7 +969,9 @@ export default function AiAssistantWidget() {
           onClick={() => setIsOpen(true)}
           className={`relative overflow-hidden rounded-full px-4 py-3 flex items-center gap-2 text-xs font-bold text-white transition-all duration-700 ease-in-out hover:brightness-110 active:scale-95 ${
             isPerfumeTheme
-              ? "border border-[#E5B8A8]/50 shadow-[0_10px_28px_rgba(91,10,30,0.35)]"
+              ? isPerfumeMujer
+                ? "border border-[#FFD6E7]/60 shadow-[0_10px_28px_rgba(166,38,96,0.35)]"
+                : "border border-[#E8CF8E]/50 shadow-[0_10px_28px_rgba(6,48,32,0.38)]"
               : "border border-white/20 shadow-[0_10px_28px_rgba(0,87,255,0.35)]"
           }`}
           aria-label="Abrir asistente de compras"
@@ -911,12 +984,22 @@ export default function AiAssistantWidget() {
           />
           <span
             aria-hidden="true"
-            className={`absolute inset-0 bg-gradient-to-r from-[#5B0A1E] to-[#8B1A35] transition-opacity duration-700 ease-in-out ${
-              isPerfumeTheme ? "opacity-100" : "opacity-0"
+            className={`absolute inset-0 bg-gradient-to-r from-[#042417] to-[#0E593B] transition-opacity duration-700 ease-in-out ${
+              isPerfumeTheme && !isPerfumeMujer ? "opacity-100" : "opacity-0"
+            }`}
+          />
+          <span
+            aria-hidden="true"
+            className={`absolute inset-0 bg-gradient-to-r from-[#8E1D4E] to-[#C23273] transition-opacity duration-700 ease-in-out ${
+              isPerfumeMujer ? "opacity-100" : "opacity-0"
             }`}
           />
           <Bot className="relative z-10 w-4 h-4" />
-          <span className="relative z-10 hidden sm:inline">
+          <span
+            className={`relative z-10 hidden sm:inline ${
+              isPerfumeTheme ? "font-playfair tracking-wide" : ""
+            }`}
+          >
             {isPerfumeTheme ? "Asistente Boutique" : "Asistente IA"}
           </span>
         </button>

@@ -18,6 +18,7 @@ import {
 } from "lucide-react";
 import { useCart } from "@/hooks/useCart";
 import { useCatalog } from "@/hooks/useCatalog";
+import { usePerfumeTheme } from "@/hooks/usePerfumeZone";
 import {
   getShippingZones,
   getShippingLabel,
@@ -29,7 +30,7 @@ import {
   calcularCoberturaEnvioSeguro,
   extractCoordinatesFromInput,
   formatEnvioUsd,
-  geocodificarDireccionCliente,
+  geocodificarDireccionClienteConEstado,
   solicitarCotizacionEnvioIA,
 } from "@/lib/deliveryCoverage";
 
@@ -52,6 +53,8 @@ export default function CartDrawer() {
     lastAddedTheme,
   } = useCart();
 
+  const { isPerfumeZone, perfumeGender } = usePerfumeTheme();
+
   const detailId = location.pathname.startsWith("/producto/")
     ? location.pathname.slice("/producto/".length)
     : "";
@@ -65,8 +68,10 @@ export default function CartDrawer() {
       : activeDetailProduct
         ? isPerfumeProduct(activeDetailProduct)
         : location.pathname === "/"
-          ? lastAddedTheme === "perfumes"
+          ? isPerfumeZone || lastAddedTheme === "perfumes"
           : false;
+
+  const isPerfumeMujer = isPerfumeTheme && perfumeGender === "mujer";
 
   const [selectedZone, setSelectedZone] = useState<string>("");
   const [zoneError, setZoneError] = useState(false);
@@ -76,7 +81,7 @@ export default function CartDrawer() {
   const [locating, setLocating] = useState(false);
   const [searchingGeo, setSearchingGeo] = useState(false);
   const [geoError, setGeoError] = useState("");
-  const [addressNotFound, setAddressNotFound] = useState(false);
+  const [isReferentialGeo, setIsReferentialGeo] = useState(false);
   const [aiQuote, setAiQuote] = useState<AiShippingQuote | null>(null);
   const [mapQuery, setMapQuery] = useState(
     coordinates
@@ -94,11 +99,11 @@ export default function CartDrawer() {
 
   const coverageEstimate = useMemo(() => {
     try {
-      return calcularCoberturaEnvioSeguro(coordinates);
+      return calcularCoberturaEnvioSeguro(coordinates, address);
     } catch {
       return null;
     }
-  }, [coordinates]);
+  }, [coordinates, address]);
 
   useEffect(() => {
     try {
@@ -106,7 +111,7 @@ export default function CartDrawer() {
         setMapQuery(
           `${coordinates.lat.toFixed(6)}, ${coordinates.lng.toFixed(6)}`
         );
-        setAddressNotFound(false);
+        setIsReferentialGeo(false);
       }
     } catch {
       // Ignora error de sincronización de mapa
@@ -119,12 +124,12 @@ export default function CartDrawer() {
     }
   }, [isOpen, address, coordinates, selectedZone]);
 
-  // Auto-geocodifica direcciones escritas para mostrar cobertura y costo sin requerir doble clic
+  // Auto-geocodifica cualquier dirección escrita para calcular siempre cobertura de 5 km y costo de envío
   useEffect(() => {
     if (!isOpen) return;
     const trimmed = address.trim();
     if (trimmed.length < 3) {
-      setAddressNotFound(false);
+      setIsReferentialGeo(false);
       return;
     }
     if (trimmed === lastAutoGeocodedRef.current && coordinates) {
@@ -141,20 +146,22 @@ export default function CartDrawer() {
           setLocation(trimmed, direct);
           setMapQuery(`${direct.lat.toFixed(6)}, ${direct.lng.toFixed(6)}`);
           setSelectedZone("");
-          setAddressNotFound(false);
+          setIsReferentialGeo(false);
           return;
         }
 
-        const resolved = await geocodificarDireccionCliente(trimmed);
+        const resolved = await geocodificarDireccionClienteConEstado(trimmed);
         if (cancelled) return;
         lastAutoGeocodedRef.current = trimmed;
         if (resolved) {
-          setLocation(trimmed, resolved);
-          setMapQuery(`${resolved.lat.toFixed(6)}, ${resolved.lng.toFixed(6)}`);
+          setLocation(trimmed, resolved.coords);
+          setMapQuery(
+            resolved.isReferentialFallback
+              ? `${trimmed}, El Salvador`
+              : `${resolved.coords.lat.toFixed(6)}, ${resolved.coords.lng.toFixed(6)}`
+          );
           setSelectedZone("");
-          setAddressNotFound(false);
-        } else {
-          setAddressNotFound(true);
+          setIsReferentialGeo(resolved.isReferentialFallback);
         }
       } catch {
         // No interrumpe la escritura si falla la geocodificación automática
@@ -169,15 +176,18 @@ export default function CartDrawer() {
 
   const coverageDistanceKey = coverageEstimate?.distanceKm ?? null;
   const coverageWithinKey = coverageEstimate?.withinCoverage ?? null;
+  const coverageIsFreeKey = Boolean(coverageEstimate?.isFreeZone);
 
   useEffect(() => {
     if (
       !isOpen ||
       coverageDistanceKey === null ||
+      !coverageWithinKey ||
+      coverageIsFreeKey ||
       !coverageEstimate ||
       items.length === 0
     ) {
-      if (!coverageEstimate) {
+      if (!coverageEstimate || !coverageWithinKey || coverageIsFreeKey) {
         setAiQuote(null);
       }
       return;
@@ -213,6 +223,7 @@ export default function CartDrawer() {
     isOpen,
     coverageDistanceKey,
     coverageWithinKey,
+    coverageIsFreeKey,
     items.length,
     totalPrice,
     totalItems,
@@ -228,13 +239,19 @@ export default function CartDrawer() {
 
   const selectedZoneObj = shippingZones.find((z) => z.name === selectedZone);
   const shippingCost = selectedZoneObj?.cost ?? null;
-  const effectiveCustomShippingUsd = aiQuote
-    ? aiQuote.shippingPriceUsd
-    : coverageEstimate
-      ? coverageEstimate.estimatedShippingUsd
-      : null;
+  const effectiveCustomShippingUsd = coverageEstimate
+    ? coverageEstimate.isFreeZone
+      ? 0
+      : coverageEstimate.withinCoverage
+        ? aiQuote
+          ? aiQuote.shippingPriceUsd
+          : coverageEstimate.estimatedShippingUsd
+        : null
+    : null;
   const approxCustomShipping =
     shippingCost === null ? effectiveCustomShippingUsd : null;
+  const isEstimatedCustomShipping =
+    approxCustomShipping !== null && !coverageEstimate?.isFreeZone;
   const totalWithShipping =
     shippingCost !== null
       ? totalPrice + shippingCost
@@ -248,7 +265,7 @@ export default function CartDrawer() {
   function handleUseLocation() {
     try {
       setGeoError("");
-      setAddressNotFound(false);
+      setIsReferentialGeo(false);
       if (!navigator.geolocation) {
         setGeoError(
           "Tu navegador no soporta geolocalización. Escribe tu dirección y presiona Buscar mi dirección."
@@ -299,7 +316,7 @@ export default function CartDrawer() {
   async function handleSearchAddress() {
     try {
       setGeoError("");
-      setAddressNotFound(false);
+      setIsReferentialGeo(false);
       const trimmed = address.trim();
       if (!trimmed) {
         setGeoError("Escribe una dirección para buscarla en el mapa.");
@@ -316,22 +333,22 @@ export default function CartDrawer() {
       }
 
       setSearchingGeo(true);
-      const resolved = await geocodificarDireccionCliente(trimmed);
+      const resolved = await geocodificarDireccionClienteConEstado(trimmed);
       lastAutoGeocodedRef.current = trimmed;
       if (resolved) {
-        setLocation(trimmed, resolved);
-        setMapQuery(`${resolved.lat.toFixed(6)}, ${resolved.lng.toFixed(6)}`);
+        setLocation(trimmed, resolved.coords);
+        setMapQuery(
+          resolved.isReferentialFallback
+            ? `${trimmed}, El Salvador`
+            : `${resolved.coords.lat.toFixed(6)}, ${resolved.coords.lng.toFixed(6)}`
+        );
         setSelectedZone("");
-        setAddressNotFound(false);
-      } else {
-        setLocation(trimmed, null);
-        setMapQuery(`${trimmed}, San Salvador, El Salvador`);
-        setAddressNotFound(true);
+        setIsReferentialGeo(resolved.isReferentialFallback);
       }
       setZoneError(false);
     } catch {
       setGeoError(
-        "No se pudo ubicar la dirección exacta. Prueba usando tu GPS o pegando un enlace de Google Maps."
+        "No se pudo completar la búsqueda. Intenta nuevamente o usa tu GPS."
       );
     } finally {
       setSearchingGeo(false);
@@ -370,7 +387,11 @@ export default function CartDrawer() {
       {/* Backdrop */}
       <div
         className={`fixed inset-0 z-40 backdrop-blur-sm ${
-          isPerfumeTheme ? "bg-[#2A050E]/45" : "bg-[#0B172A]/45"
+          isPerfumeTheme
+            ? isPerfumeMujer
+              ? "bg-[#3D0720]/45"
+              : "bg-[#042417]/45"
+            : "bg-[#0B172A]/45"
         }`}
         onClick={closeCart}
       />
@@ -379,7 +400,9 @@ export default function CartDrawer() {
       <div
         className={`fixed top-0 right-0 h-full w-full max-w-md z-50 flex flex-col animate-slide-up overflow-hidden border-l font-montserrat ${
           isPerfumeTheme
-            ? "bg-[#FDF7F5] border-[#DFC5BC] text-[#3B0815] shadow-[-12px_0_40px_rgba(77,8,25,0.18)]"
+            ? isPerfumeMujer
+              ? "bg-[#FFF8FB] border-[#F0C4D7] text-[#5C0E32] shadow-[-12px_0_40px_rgba(142,29,78,0.18)]"
+              : "bg-[#F7FBF9] border-[#C5DFD1] text-[#063020] shadow-[-12px_0_40px_rgba(6,48,32,0.18)]"
             : "bg-[#F4F8FF] border-[#CFE0FA] text-[#0B172A] shadow-[-12px_0_40px_rgba(0,68,180,0.16)]"
         }`}
       >
@@ -387,20 +410,28 @@ export default function CartDrawer() {
         <div
           className={`flex items-center justify-between px-5 py-4 border-b shrink-0 ${
             isPerfumeTheme
-              ? "bg-[#FAF0EC] border-[#E2C8BF]"
+              ? isPerfumeMujer
+                ? "bg-[#FFF1F6] border-[#F0C4D7]"
+                : "bg-[#EEF7F2] border-[#C5DFD1]"
               : "bg-white border-[#DCE7F8]"
           }`}
         >
           <div className="flex items-center gap-2">
             <ShoppingCart
               className={`w-5 h-5 ${
-                isPerfumeTheme ? "text-[#5B0A1E]" : "text-[#0057FF]"
+                isPerfumeTheme
+                  ? isPerfumeMujer
+                    ? "text-[#A62660]"
+                    : "text-[#0B4A31]"
+                  : "text-[#0057FF]"
               }`}
             />
             <h2
               className={`font-bold ${
                 isPerfumeTheme
-                  ? "font-playfair text-[#4D0819] text-lg"
+                  ? isPerfumeMujer
+                    ? "font-playfair text-[#5C0E32] text-lg"
+                    : "font-playfair text-[#063020] text-lg"
                   : "font-montserrat text-[#0B172A] text-base font-extrabold"
               }`}
             >
@@ -410,7 +441,9 @@ export default function CartDrawer() {
               <span
                 className={`font-black text-xs w-5 h-5 rounded-full flex items-center justify-center ${
                   isPerfumeTheme
-                    ? "bg-[#5B0A1E] text-[#FFF8F6]"
+                    ? isPerfumeMujer
+                      ? "bg-[#A62660] text-[#FFF8FB]"
+                      : "bg-[#0B4A31] text-[#F7FBF9]"
                     : "bg-[#0057FF] text-white"
                 }`}
               >
@@ -422,7 +455,9 @@ export default function CartDrawer() {
             onClick={closeCart}
             className={`transition-colors p-1 ${
               isPerfumeTheme
-                ? "text-[#8B5D68] hover:text-[#4D0819]"
+                ? isPerfumeMujer
+                  ? "text-[#9F5977] hover:text-[#5C0E32]"
+                  : "text-[#4D7866] hover:text-[#063020]"
                 : "text-[#6B7E9E] hover:text-[#0B172A]"
             }`}
             aria-label="Cerrar carrito"
@@ -437,19 +472,29 @@ export default function CartDrawer() {
             <div
               className={`w-16 h-16 rounded-2xl border flex items-center justify-center ${
                 isPerfumeTheme
-                  ? "bg-[#FAF0EC] border-[#E2C8BF]"
+                  ? isPerfumeMujer
+                    ? "bg-[#FFF1F6] border-[#F0C4D7]"
+                    : "bg-[#EEF7F2] border-[#C5DFD1]"
                   : "bg-white border-[#DCE7F8] shadow-sm"
               }`}
             >
               <ShoppingCart
                 className={`w-8 h-8 ${
-                  isPerfumeTheme ? "text-[#8B1A35]/50" : "text-[#0057FF]/45"
+                  isPerfumeTheme
+                    ? isPerfumeMujer
+                      ? "text-[#A62660]/50"
+                      : "text-[#0B4A31]/50"
+                    : "text-[#0057FF]/45"
                 }`}
               />
             </div>
             <p
               className={`text-sm ${
-                isPerfumeTheme ? "text-[#6B4A52]" : "text-[#4D607D]"
+                isPerfumeTheme
+                  ? isPerfumeMujer
+                    ? "text-[#7E3B59]"
+                    : "text-[#355E4D]"
+                  : "text-[#4D607D]"
               }`}
             >
               Tu carrito está vacío
@@ -458,7 +503,9 @@ export default function CartDrawer() {
               onClick={closeCart}
               className={
                 isPerfumeTheme
-                  ? "bg-[#5B0A1E] hover:bg-[#7A102B] text-white text-xs font-bold uppercase tracking-wider px-6 py-3 rounded-xl transition-colors"
+                  ? isPerfumeMujer
+                    ? "font-playfair bg-[#A62660] hover:bg-[#C23273] text-white text-sm font-bold tracking-wider px-6 py-3 rounded-xl transition-colors"
+                    : "font-playfair bg-[#0B4A31] hover:bg-[#116443] text-white text-sm font-bold tracking-wider px-6 py-3 rounded-xl transition-colors"
                   : "btn-gotech text-sm px-6 py-2.5"
               }
             >
@@ -478,7 +525,9 @@ export default function CartDrawer() {
                       key={product.id}
                       className={`p-3 flex gap-3 items-start rounded-xl border ${
                         isPerfumeTheme
-                          ? "bg-white border-[#E6D1CA]"
+                          ? isPerfumeMujer
+                            ? "bg-white border-[#F2C9DA]"
+                            : "bg-white border-[#C8E0D4]"
                           : "bg-white border-[#DCE7F8] shadow-[0_6px_18px_rgba(0,68,180,0.06)]"
                       }`}
                     >
@@ -486,14 +535,20 @@ export default function CartDrawer() {
                         src={product.image}
                         alt={product.name}
                         className={`w-16 h-16 object-cover rounded-xl shrink-0 ${
-                          isPerfumeTheme ? "bg-[#FAF2EF]" : "bg-[#F4F8FF]"
+                          isPerfumeTheme
+                            ? isPerfumeMujer
+                              ? "bg-[#FFF3F7]"
+                              : "bg-[#EEF7F2]"
+                            : "bg-[#F4F8FF]"
                         }`}
                       />
                       <div className="flex-1 min-w-0">
                         <p
                           className={`font-semibold text-xs leading-tight line-clamp-2 mb-1 ${
                             isPerfumeTheme
-                              ? "font-playfair text-sm text-[#3B0815]"
+                              ? isPerfumeMujer
+                                ? "font-playfair text-sm text-[#5C0E32]"
+                                : "font-playfair text-sm text-[#063020]"
                               : "text-[#0B172A] font-bold"
                           }`}
                         >
@@ -503,7 +558,9 @@ export default function CartDrawer() {
                           <span
                             className={`font-black text-sm ${
                               isPerfumeTheme
-                                ? "font-playfair text-[#5B0A1E]"
+                                ? isPerfumeMujer
+                                  ? "font-playfair text-[#A62660]"
+                                  : "font-playfair text-[#0B4A31]"
                                 : "text-[#0057FF]"
                             }`}
                           >
@@ -518,7 +575,9 @@ export default function CartDrawer() {
                             }
                             className={`w-6 h-6 rounded-lg border flex items-center justify-center transition-colors ${
                               isPerfumeTheme
-                                ? "bg-[#FAF0EC] border-[#DFC5BC] text-[#5B0A1E] hover:border-[#5B0A1E]"
+                                ? isPerfumeMujer
+                                  ? "bg-[#FFF1F6] border-[#F0C4D7] text-[#A62660] hover:border-[#A62660]"
+                                  : "bg-[#EEF7F2] border-[#C5DFD1] text-[#0B4A31] hover:border-[#0B4A31]"
                                 : "bg-[#F4F8FF] border-[#CFE0FA] text-[#0057FF] hover:border-[#0057FF]"
                             }`}
                           >
@@ -526,7 +585,11 @@ export default function CartDrawer() {
                           </button>
                           <span
                             className={`font-bold text-sm w-5 text-center ${
-                              isPerfumeTheme ? "text-[#3B0815]" : "text-[#0B172A]"
+                              isPerfumeTheme
+                                ? isPerfumeMujer
+                                  ? "text-[#5C0E32]"
+                                  : "text-[#063020]"
+                                : "text-[#0B172A]"
                             }`}
                           >
                             {quantity}
@@ -538,7 +601,9 @@ export default function CartDrawer() {
                             disabled={quantity >= product.stock}
                             className={`w-6 h-6 rounded-lg border flex items-center justify-center transition-colors disabled:opacity-30 disabled:cursor-not-allowed ${
                               isPerfumeTheme
-                                ? "bg-[#FAF0EC] border-[#DFC5BC] text-[#5B0A1E] hover:border-[#5B0A1E]"
+                                ? isPerfumeMujer
+                                  ? "bg-[#FFF1F6] border-[#F0C4D7] text-[#A62660] hover:border-[#A62660]"
+                                  : "bg-[#EEF7F2] border-[#C5DFD1] text-[#0B4A31] hover:border-[#0B4A31]"
                                 : "bg-[#F4F8FF] border-[#CFE0FA] text-[#0057FF] hover:border-[#0057FF]"
                             }`}
                           >
@@ -551,7 +616,9 @@ export default function CartDrawer() {
                           onClick={() => removeFromCart(product.id)}
                           className={`transition-colors ${
                             isPerfumeTheme
-                              ? "text-[#B08D95] hover:text-red-600"
+                              ? isPerfumeMujer
+                                ? "text-[#C089A1] hover:text-red-600"
+                                : "text-[#7A9C8C] hover:text-red-600"
                               : "text-[#8EA0BA] hover:text-red-600"
                           }`}
                         >
@@ -560,7 +627,9 @@ export default function CartDrawer() {
                         <span
                           className={`text-xs font-bold ${
                             isPerfumeTheme
-                              ? "text-[#5E3A43]"
+                              ? isPerfumeMujer
+                                ? "text-[#7E3B59]"
+                                : "text-[#355E4D]"
                               : "text-[#4D607D]"
                           }`}
                         >
@@ -578,7 +647,11 @@ export default function CartDrawer() {
                 className={`rounded-xl border overflow-hidden transition-colors ${
                   isPerfumeTheme
                     ? `bg-white ${
-                        zoneError ? "border-amber-600" : "border-[#E5CEC6]"
+                        zoneError
+                          ? "border-amber-600"
+                          : isPerfumeMujer
+                            ? "border-[#F0C4D7]"
+                            : "border-[#C5DFD1]"
                       }`
                     : `bg-white shadow-[0_6px_18px_rgba(0,68,180,0.06)] ${
                         zoneError
@@ -590,18 +663,28 @@ export default function CartDrawer() {
                 <div
                   className={`flex items-center gap-2 px-4 py-3 border-b ${
                     isPerfumeTheme
-                      ? "border-[#E5CEC6] bg-[#FAF0EC]"
+                      ? isPerfumeMujer
+                        ? "border-[#F0C4D7] bg-[#FFF1F6]"
+                        : "border-[#C5DFD1] bg-[#EEF7F2]"
                       : "border-[#DCE7F8] bg-[#F4F8FF]"
                   }`}
                 >
                   <Truck
                     className={`w-4 h-4 shrink-0 ${
-                      isPerfumeTheme ? "text-[#5B0A1E]" : "text-[#0057FF]"
+                      isPerfumeTheme
+                        ? isPerfumeMujer
+                          ? "text-[#A62660]"
+                          : "text-[#0B4A31]"
+                        : "text-[#0057FF]"
                     }`}
                   />
                   <p
                     className={`text-xs font-bold uppercase tracking-wider ${
-                      isPerfumeTheme ? "text-[#5B0A1E]" : "text-[#0057FF]"
+                      isPerfumeTheme
+                        ? isPerfumeMujer
+                          ? "text-[#A62660]"
+                          : "text-[#0B4A31]"
+                        : "text-[#0057FF]"
                     }`}
                   >
                     Elige tu zona de entrega
@@ -611,7 +694,11 @@ export default function CartDrawer() {
                 <div className="p-4 space-y-2.5">
                   <p
                     className={`text-xs font-semibold leading-relaxed ${
-                      isPerfumeTheme ? "text-[#3B0815]" : "text-[#0B172A]"
+                      isPerfumeTheme
+                        ? isPerfumeMujer
+                          ? "text-[#5C0E32]"
+                          : "text-[#063020]"
+                        : "text-[#0B172A]"
                     }`}
                   >
                     {shippingLabel}
@@ -643,9 +730,13 @@ export default function CartDrawer() {
                             }}
                             className={`w-full flex items-center justify-between rounded-xl px-3 py-2 text-left transition-all border ${
                               isPerfumeTheme
-                                ? active
-                                  ? "border-[#5B0A1E] bg-[#F7E8E3]"
-                                  : "border-[#EAD9D3] bg-[#FDF9F8] hover:border-[#A6596C]"
+                                ? isPerfumeMujer
+                                  ? active
+                                    ? "border-[#A62660] bg-[#FCE6EF]"
+                                    : "border-[#F2D5E1] bg-[#FFF8FB] hover:border-[#D17099]"
+                                  : active
+                                    ? "border-[#0B4A31] bg-[#E2F0E9]"
+                                    : "border-[#D4E7DC] bg-[#F7FBF9] hover:border-[#4D8A70]"
                                 : active
                                   ? "border-[#0057FF] bg-[#EAF2FF]"
                                   : "border-[#E2ECFA] bg-[#F8FAFF] hover:border-[#0057FF]/50"
@@ -655,9 +746,13 @@ export default function CartDrawer() {
                               <div
                                 className={`w-3.5 h-3.5 rounded-full border-2 flex items-center justify-center shrink-0 ${
                                   isPerfumeTheme
-                                    ? active
-                                      ? "border-[#5B0A1E]"
-                                      : "border-[#C9A89D]"
+                                    ? isPerfumeMujer
+                                      ? active
+                                        ? "border-[#A62660]"
+                                        : "border-[#D9A7BC]"
+                                      : active
+                                        ? "border-[#0B4A31]"
+                                        : "border-[#9EC4B2]"
                                     : active
                                       ? "border-[#0057FF]"
                                       : "border-[#B6C8E6]"
@@ -667,7 +762,9 @@ export default function CartDrawer() {
                                   <div
                                     className={`w-1.5 h-1.5 rounded-full ${
                                       isPerfumeTheme
-                                        ? "bg-[#5B0A1E]"
+                                        ? isPerfumeMujer
+                                          ? "bg-[#A62660]"
+                                          : "bg-[#0B4A31]"
                                         : "bg-[#0057FF]"
                                     }`}
                                   />
@@ -676,9 +773,13 @@ export default function CartDrawer() {
                               <span
                                 className={`text-[11px] font-semibold truncate ${
                                   isPerfumeTheme
-                                    ? active
-                                      ? "text-[#3B0815]"
-                                      : "text-[#6B4A52]"
+                                    ? isPerfumeMujer
+                                      ? active
+                                        ? "text-[#5C0E32]"
+                                        : "text-[#7E3B59]"
+                                      : active
+                                        ? "text-[#063020]"
+                                        : "text-[#355E4D]"
                                     : active
                                       ? "text-[#0B172A] font-bold"
                                       : "text-[#4D607D]"
@@ -687,13 +788,7 @@ export default function CartDrawer() {
                                 {z.name}
                               </span>
                             </div>
-                            <span
-                              className={`text-[11px] font-bold shrink-0 ml-2 ${
-                                isPerfumeTheme
-                                  ? "text-emerald-700"
-                                  : "text-emerald-700"
-                              }`}
-                            >
+                            <span className="text-[11px] font-bold shrink-0 ml-2 text-emerald-700">
                               GRATIS
                             </span>
                           </button>
@@ -717,9 +812,13 @@ export default function CartDrawer() {
                             }}
                             className={`w-full flex items-center justify-between rounded-xl px-3 py-2 text-left transition-all border ${
                               isPerfumeTheme
-                                ? active
-                                  ? "border-[#5B0A1E] bg-[#F7E8E3]"
-                                  : "border-[#EAD9D3] bg-[#FDF9F8] hover:border-[#A6596C]"
+                                ? isPerfumeMujer
+                                  ? active
+                                    ? "border-[#A62660] bg-[#FCE6EF]"
+                                    : "border-[#F2D5E1] bg-[#FFF8FB] hover:border-[#D17099]"
+                                  : active
+                                    ? "border-[#0B4A31] bg-[#E2F0E9]"
+                                    : "border-[#D4E7DC] bg-[#F7FBF9] hover:border-[#4D8A70]"
                                 : active
                                   ? "border-[#0057FF] bg-[#EAF2FF]"
                                   : "border-[#E2ECFA] bg-[#F8FAFF] hover:border-[#0057FF]/50"
@@ -729,9 +828,13 @@ export default function CartDrawer() {
                               <div
                                 className={`w-3.5 h-3.5 rounded-full border-2 flex items-center justify-center shrink-0 ${
                                   isPerfumeTheme
-                                    ? active
-                                      ? "border-[#5B0A1E]"
-                                      : "border-[#C9A89D]"
+                                    ? isPerfumeMujer
+                                      ? active
+                                        ? "border-[#A62660]"
+                                        : "border-[#D9A7BC]"
+                                      : active
+                                        ? "border-[#0B4A31]"
+                                        : "border-[#9EC4B2]"
                                     : active
                                       ? "border-[#0057FF]"
                                       : "border-[#B6C8E6]"
@@ -741,7 +844,9 @@ export default function CartDrawer() {
                                   <div
                                     className={`w-1.5 h-1.5 rounded-full ${
                                       isPerfumeTheme
-                                        ? "bg-[#5B0A1E]"
+                                        ? isPerfumeMujer
+                                          ? "bg-[#A62660]"
+                                          : "bg-[#0B4A31]"
                                         : "bg-[#0057FF]"
                                     }`}
                                   />
@@ -750,9 +855,13 @@ export default function CartDrawer() {
                               <span
                                 className={`text-[11px] font-semibold leading-tight ${
                                   isPerfumeTheme
-                                    ? active
-                                      ? "text-[#3B0815]"
-                                      : "text-[#6B4A52]"
+                                    ? isPerfumeMujer
+                                      ? active
+                                        ? "text-[#5C0E32]"
+                                        : "text-[#7E3B59]"
+                                      : active
+                                        ? "text-[#063020]"
+                                        : "text-[#355E4D]"
                                     : active
                                       ? "text-[#0B172A] font-bold"
                                       : "text-[#4D607D]"
@@ -766,13 +875,7 @@ export default function CartDrawer() {
                                 )}
                               </span>
                             </div>
-                            <span
-                              className={`text-[11px] font-bold shrink-0 ml-2 ${
-                                isPerfumeTheme
-                                  ? "text-amber-700"
-                                  : "text-amber-700"
-                              }`}
-                            >
+                            <span className="text-[11px] font-bold shrink-0 ml-2 text-amber-700">
                               +${z.cost.toFixed(2)}
                             </span>
                           </button>
@@ -804,7 +907,9 @@ export default function CartDrawer() {
               <div
                 className={`rounded-xl border overflow-hidden ${
                   isPerfumeTheme
-                    ? "border-[#E5CEC6] bg-white"
+                    ? isPerfumeMujer
+                      ? "border-[#F0C4D7] bg-white"
+                      : "border-[#C5DFD1] bg-white"
                     : "border-[#DCE7F8] bg-white shadow-[0_6px_18px_rgba(0,68,180,0.06)]"
                 }`}
               >
@@ -813,26 +918,36 @@ export default function CartDrawer() {
                   onClick={() => setShowCustomLocation((v) => !v)}
                   className={`w-full flex items-center justify-between gap-2 px-4 py-3 text-left transition-colors ${
                     isPerfumeTheme
-                      ? "hover:bg-[#FAF0EC]"
+                      ? isPerfumeMujer
+                        ? "hover:bg-[#FFF1F6]"
+                        : "hover:bg-[#EEF7F2]"
                       : "hover:bg-[#F4F8FF]"
                   }`}
                 >
                   <div className="flex items-center gap-2 min-w-0">
                     <MapPin
                       className={`w-4 h-4 shrink-0 ${
-                        isPerfumeTheme ? "text-[#5B0A1E]" : "text-[#0057FF]"
+                        isPerfumeTheme
+                          ? isPerfumeMujer
+                            ? "text-[#A62660]"
+                            : "text-[#0B4A31]"
+                          : "text-[#0057FF]"
                       }`}
                     />
                     <div className="min-w-0 flex-1">
                       <div className="flex items-center justify-between gap-2">
                         <p
                           className={`text-xs font-bold ${
-                            isPerfumeTheme ? "text-[#5B0A1E]" : "text-[#0057FF]"
+                            isPerfumeTheme
+                              ? isPerfumeMujer
+                                ? "text-[#A62660]"
+                                : "text-[#0B4A31]"
+                              : "text-[#0057FF]"
                           }`}
                         >
                           Seleccionar ubicación personalizada
                         </p>
-                        {coverageEstimate && effectiveCustomShippingUsd !== null && (
+                        {coverageEstimate && (
                           <span
                             className={`shrink-0 text-[10px] font-bold px-2 py-0.5 rounded-full border ${
                               coverageEstimate.withinCoverage
@@ -840,8 +955,14 @@ export default function CartDrawer() {
                                 : "bg-amber-50 border-amber-200 text-amber-700"
                             }`}
                           >
-                            {coverageEstimate.distanceKm.toFixed(1)} km · ~
-                            {formatEnvioUsd(effectiveCustomShippingUsd)}
+                            {coverageEstimate.isFreeZone
+                              ? "GRATIS"
+                              : coverageEstimate.withinCoverage &&
+                                  effectiveCustomShippingUsd !== null
+                                ? `${coverageEstimate.distanceKm.toFixed(1)} km · ~${formatEnvioUsd(
+                                    effectiveCustomShippingUsd
+                                  )}`
+                                : `${coverageEstimate.distanceKm.toFixed(1)} km · Sin cobertura`}
                           </span>
                         )}
                       </div>
@@ -849,15 +970,22 @@ export default function CartDrawer() {
                         <p
                           className={`text-[11px] truncate ${
                             isPerfumeTheme
-                              ? "text-[#6B4A52]"
+                              ? isPerfumeMujer
+                                ? "text-[#7E3B59]"
+                                : "text-[#355E4D]"
                               : "text-[#4D607D]"
                           }`}
                         >
                           {address.trim() || "Ubicación GPS seleccionada"}
-                          {coverageEstimate && effectiveCustomShippingUsd !== null
-                            ? ` · Envío aprox.: ~${formatEnvioUsd(
-                                effectiveCustomShippingUsd
-                              )}`
+                          {coverageEstimate
+                            ? coverageEstimate.isFreeZone
+                              ? " · Envío GRATIS"
+                              : coverageEstimate.withinCoverage &&
+                                  effectiveCustomShippingUsd !== null
+                                ? ` · Estimación: ~${formatEnvioUsd(
+                                    effectiveCustomShippingUsd
+                                  )} (acordar en WhatsApp)`
+                                : " · No se puede hacer el envío (consulta en WhatsApp)"
                             : ""}
                         </p>
                       )}
@@ -866,13 +994,21 @@ export default function CartDrawer() {
                   {showCustomLocation ? (
                     <ChevronUp
                       className={`w-4 h-4 shrink-0 ${
-                        isPerfumeTheme ? "text-[#7A102B]" : "text-[#0057FF]"
+                        isPerfumeTheme
+                          ? isPerfumeMujer
+                            ? "text-[#A62660]"
+                            : "text-[#0B4A31]"
+                          : "text-[#0057FF]"
                       }`}
                     />
                   ) : (
                     <ChevronDown
                       className={`w-4 h-4 shrink-0 ${
-                        isPerfumeTheme ? "text-[#7A102B]" : "text-[#0057FF]"
+                        isPerfumeTheme
+                          ? isPerfumeMujer
+                            ? "text-[#A62660]"
+                            : "text-[#0B4A31]"
+                          : "text-[#0057FF]"
                       }`}
                     />
                   )}
@@ -882,7 +1018,9 @@ export default function CartDrawer() {
                   <div
                     className={`px-4 pb-4 pt-2 border-t space-y-3 ${
                       isPerfumeTheme
-                        ? "border-[#F0E2DD]"
+                        ? isPerfumeMujer
+                          ? "border-[#FAE0EA]"
+                          : "border-[#DCEEE4]"
                         : "border-[#E7EFFC]"
                     }`}
                   >
@@ -890,7 +1028,9 @@ export default function CartDrawer() {
                       <label
                         className={`text-[10px] font-bold uppercase tracking-wider mb-1.5 block ${
                           isPerfumeTheme
-                            ? "text-[#7A102B]"
+                            ? isPerfumeMujer
+                              ? "text-[#A62660]"
+                              : "text-[#0B4A31]"
                             : "text-[#0057FF]"
                         }`}
                       >
@@ -912,7 +1052,9 @@ export default function CartDrawer() {
                         placeholder="Ej: Col. Escalón, Calle El Pedregal #12 o enlace Maps"
                         className={`w-full border rounded-xl px-3.5 py-2.5 text-xs focus:outline-none transition-colors ${
                           isPerfumeTheme
-                            ? "bg-[#FDF9F8] border-[#DFC5BC] text-[#3B0815] placeholder-[#A88B92] focus:border-[#5B0A1E]"
+                            ? isPerfumeMujer
+                              ? "bg-[#FFF8FB] border-[#F0C4D7] text-[#5C0E32] placeholder-[#B07A92] focus:border-[#A62660]"
+                              : "bg-[#F7FBF9] border-[#C5DFD1] text-[#063020] placeholder-[#6B9382] focus:border-[#0B4A31]"
                             : "bg-[#F8FAFF] border-[#CFE0FA] text-[#0B172A] placeholder-[#7A8CA8] focus:border-[#0057FF]"
                         }`}
                       />
@@ -925,7 +1067,9 @@ export default function CartDrawer() {
                         disabled={searchingGeo}
                         className={`flex items-center justify-center gap-1.5 border rounded-xl py-2.5 px-3 text-xs font-bold transition-all disabled:opacity-50 ${
                           isPerfumeTheme
-                            ? "bg-[#FAF0EC] border-[#C9A89D] hover:bg-[#F3DFD8] text-[#5B0A1E]"
+                            ? isPerfumeMujer
+                              ? "bg-[#FFF1F6] border-[#F0C4D7] hover:bg-[#FCE4EE] text-[#A62660]"
+                              : "bg-[#EEF7F2] border-[#C5DFD1] hover:bg-[#E0F0E8] text-[#0B4A31]"
                             : "bg-[#EAF2FF] border-[#BFD7FF] hover:bg-[#DCEAFF] text-[#0057FF]"
                         }`}
                       >
@@ -943,7 +1087,9 @@ export default function CartDrawer() {
                         disabled={locating}
                         className={`flex items-center justify-center gap-1.5 border rounded-xl py-2.5 px-3 text-xs font-semibold transition-all disabled:opacity-50 ${
                           isPerfumeTheme
-                            ? "bg-white border-[#DFC5BC] hover:border-[#5B0A1E] text-[#4D0819]"
+                            ? isPerfumeMujer
+                              ? "bg-white border-[#F0C4D7] hover:border-[#A62660] text-[#5C0E32]"
+                              : "bg-white border-[#C5DFD1] hover:border-[#0B4A31] text-[#063020]"
                             : "bg-white border-[#CFE0FA] hover:border-[#0057FF] text-[#0B172A] hover:text-[#0057FF]"
                         }`}
                       >
@@ -962,13 +1108,11 @@ export default function CartDrawer() {
                       </p>
                     )}
 
-                    {addressNotFound && !coverageEstimate && address.trim().length >= 3 && (
-                      <div className="rounded-xl border border-amber-200 bg-amber-50 p-2.5 text-[11px] text-amber-900 leading-snug">
-                        No ubicamos esa dirección exacta para calcular km.
-                        Agrega tu colonia o punto conocido (ej:{" "}
-                        <strong>Col. Escalón, Metrocentro, Santa Tecla</strong>)
-                        o presiona <strong>Usar mi GPS</strong>.
-                      </div>
+                    {isReferentialGeo && coverageEstimate && address.trim().length >= 3 && (
+                      <p className="text-[10.5px] opacity-80 leading-snug px-1">
+                        Cálculo referencial en San Salvador; agrega tu colonia o
+                        presiona <strong>Usar mi GPS</strong> si deseas mayor exactitud.
+                      </p>
                     )}
 
                     {/* Resultado limpio de cobertura de 5 km y costo aproximado de envío (sin punto de origen ni desglose interno) */}
@@ -1001,23 +1145,40 @@ export default function CartDrawer() {
                                   {coverageEstimate.distanceKm.toFixed(2)} km
                                 </strong>
                               </span>
-                              <span className="font-bold">
-                                Envío aprox.: ~
-                                {formatEnvioUsd(
-                                  effectiveCustomShippingUsd ??
-                                    coverageEstimate.estimatedShippingUsd
-                                )}{" "}
-                                USD
-                              </span>
+                              {coverageEstimate.isFreeZone ? (
+                                <span className="font-bold text-emerald-700">
+                                  Envío: GRATIS
+                                </span>
+                              ) : coverageEstimate.withinCoverage ? (
+                                <span className="font-bold">
+                                  Estimación de envío: ~
+                                  {formatEnvioUsd(
+                                    effectiveCustomShippingUsd ??
+                                      coverageEstimate.estimatedShippingUsd
+                                  )}{" "}
+                                  USD
+                                </span>
+                              ) : (
+                                <span className="font-bold text-amber-900">
+                                  Supera {coverageEstimate.maxCoverageKm.toFixed(0)} km
+                                </span>
+                              )}
                             </div>
-                            {!coverageEstimate.withinCoverage && (
-                              <p className="text-[10.5px] leading-snug text-amber-800 pt-1">
-                                Tu ubicación supera el límite directo de{" "}
-                                {coverageEstimate.maxCoverageKm.toFixed(0)} km.
-                                El monto mostrado es referencial y el envío debe
-                                coordinarse por WhatsApp.
-                              </p>
-                            )}
+                            <p
+                              className={`text-[10.5px] leading-snug pt-1 font-medium ${
+                                coverageEstimate.withinCoverage
+                                  ? "text-emerald-900"
+                                  : "text-amber-900"
+                              }`}
+                            >
+                              {coverageEstimate.isFreeZone
+                                ? "Aplica envío gratis únicamente en este punto exacto (cercanías no aplican)."
+                                : coverageEstimate.withinCoverage
+                                  ? "Es una estimación; el precio final se debe acordar en WhatsApp."
+                                  : `Supera el límite de ${coverageEstimate.maxCoverageKm.toFixed(
+                                      0
+                                    )} km. No se puede hacer el envío (consulta en WhatsApp).`}
+                            </p>
                           </div>
                         </div>
                       </div>
@@ -1038,14 +1199,22 @@ export default function CartDrawer() {
                           target="_blank"
                           rel="noopener noreferrer"
                           className={`font-semibold hover:underline ${
-                            isPerfumeTheme ? "text-[#5B0A1E]" : "text-[#0057FF]"
+                            isPerfumeTheme
+                              ? isPerfumeMujer
+                                ? "text-[#A62660]"
+                                : "text-[#0B4A31]"
+                              : "text-[#0057FF]"
                           }`}
                         >
                           Google Maps ↗
                         </a>
                         <span
                           className={
-                            isPerfumeTheme ? "text-[#C9A89D]" : "text-[#C0D1EC]"
+                            isPerfumeTheme
+                              ? isPerfumeMujer
+                                ? "text-[#E3A9C3]"
+                                : "text-[#9EC4B2]"
+                              : "text-[#C0D1EC]"
                           }
                         >
                           ·
@@ -1063,7 +1232,11 @@ export default function CartDrawer() {
                           target="_blank"
                           rel="noopener noreferrer"
                           className={`font-semibold hover:underline ${
-                            isPerfumeTheme ? "text-[#5B0A1E]" : "text-[#0057FF]"
+                            isPerfumeTheme
+                              ? isPerfumeMujer
+                                ? "text-[#A62660]"
+                                : "text-[#0B4A31]"
+                              : "text-[#0057FF]"
                           }`}
                         >
                           Waze ↗
@@ -1074,7 +1247,9 @@ export default function CartDrawer() {
                     <div
                       className={`rounded-xl overflow-hidden border h-44 ${
                         isPerfumeTheme
-                          ? "border-[#E5CEC6] bg-[#FAF0EC]"
+                          ? isPerfumeMujer
+                            ? "border-[#F0C4D7] bg-[#FFF1F6]"
+                            : "border-[#C5DFD1] bg-[#EEF7F2]"
                           : "border-[#DCE7F8] bg-[#F4F8FF]"
                       }`}
                     >
@@ -1098,14 +1273,20 @@ export default function CartDrawer() {
             <div
               className={`shrink-0 border-t px-5 py-4 space-y-3 ${
                 isPerfumeTheme
-                  ? "border-[#E2C8BF] bg-[#FAF0EC]"
+                  ? isPerfumeMujer
+                    ? "border-[#F0C4D7] bg-[#FFF1F6]"
+                    : "border-[#C5DFD1] bg-[#EEF7F2]"
                   : "border-[#DCE7F8] bg-white"
               }`}
             >
               <div className="space-y-1 px-1">
                 <div
                   className={`flex items-center justify-between text-xs ${
-                    isPerfumeTheme ? "text-[#6B4A52]" : "text-[#546885]"
+                    isPerfumeTheme
+                      ? isPerfumeMujer
+                        ? "text-[#7E3B59]"
+                        : "text-[#355E4D]"
+                      : "text-[#546885]"
                   }`}
                 >
                   <span>Subtotal</span>
@@ -1114,14 +1295,22 @@ export default function CartDrawer() {
                 <div className="flex items-center justify-between text-xs gap-2">
                   <span
                     className={
-                      isPerfumeTheme ? "text-[#6B4A52]" : "text-[#546885]"
+                      isPerfumeTheme
+                        ? isPerfumeMujer
+                          ? "text-[#7E3B59]"
+                          : "text-[#355E4D]"
+                        : "text-[#546885]"
                     }
                   >
                     Envío{" "}
                     {selectedZone
                       ? `(${selectedZone})`
                       : coverageEstimate
-                        ? `aprox. (${coverageEstimate.distanceKm.toFixed(2)} km)`
+                        ? coverageEstimate.isFreeZone
+                          ? `(${coverageEstimate.freeZoneName})`
+                          : coverageEstimate.withinCoverage
+                            ? `estimado (${coverageEstimate.distanceKm.toFixed(2)} km)`
+                            : `(${coverageEstimate.distanceKm.toFixed(2)} km)`
                         : ""}
                   </span>
                   <span
@@ -1133,9 +1322,11 @@ export default function CartDrawer() {
                           : coverageEstimate
                             ? coverageEstimate.withinCoverage
                               ? "text-emerald-700 font-bold"
-                              : "text-amber-700 font-bold"
+                              : "text-amber-700 font-bold text-right"
                             : isPerfumeTheme
-                              ? "text-[#9A7A82]"
+                              ? isPerfumeMujer
+                                ? "text-[#B07A92]"
+                                : "text-[#6B9382]"
                               : "text-[#7A8CA8]"
                     }
                   >
@@ -1147,12 +1338,13 @@ export default function CartDrawer() {
                               ? `$${shippingCost}`
                               : `$${shippingCost.toFixed(2)}`
                           }`
-                        : coverageEstimate && effectiveCustomShippingUsd !== null
-                          ? coverageEstimate.withinCoverage
-                            ? `~${formatEnvioUsd(effectiveCustomShippingUsd)}`
-                            : `~${formatEnvioUsd(
-                                effectiveCustomShippingUsd
-                              )} (coordinar)`
+                        : coverageEstimate
+                          ? coverageEstimate.isFreeZone
+                            ? "GRATIS"
+                            : coverageEstimate.withinCoverage &&
+                                effectiveCustomShippingUsd !== null
+                              ? `~${formatEnvioUsd(effectiveCustomShippingUsd)} (estimado)`
+                              : "No se puede hacer el envío (consulta en WhatsApp)"
                           : hasCustomLocation
                             ? "Por confirmar"
                             : "Selecciona zona"}
@@ -1160,29 +1352,63 @@ export default function CartDrawer() {
                 </div>
                 <div
                   className={`flex items-center justify-between pt-1 border-t ${
-                    isPerfumeTheme ? "border-[#DFC5BC]" : "border-[#E7EFFC]"
+                    isPerfumeTheme
+                      ? isPerfumeMujer
+                        ? "border-[#F0C4D7]"
+                        : "border-[#C5DFD1]"
+                      : "border-[#E7EFFC]"
                   }`}
                 >
                   <span
                     className={`text-sm font-semibold ${
-                      isPerfumeTheme ? "text-[#4D0819]" : "text-[#0B172A]"
+                      isPerfumeTheme
+                        ? isPerfumeMujer
+                          ? "text-[#5C0E32]"
+                          : "text-[#063020]"
+                        : "text-[#0B172A]"
                     }`}
                   >
-                    {approxCustomShipping !== null
-                      ? "Total aproximado"
-                      : "Total"}
+                    {isEstimatedCustomShipping ? "Total estimado" : "Total"}
                   </span>
                   <span
                     className={
                       isPerfumeTheme
-                        ? "font-playfair font-bold text-2xl text-[#4D0819]"
+                        ? isPerfumeMujer
+                          ? "font-playfair font-bold text-2xl text-[#5C0E32]"
+                          : "font-playfair font-bold text-2xl text-[#063020]"
                         : "font-montserrat font-black text-2xl text-[#0057FF]"
                     }
                   >
-                    {approxCustomShipping !== null ? "~" : ""}$
+                    {isEstimatedCustomShipping ? "~" : ""}$
                     {totalWithShipping.toFixed(2)}
                   </span>
                 </div>
+                {isEstimatedCustomShipping && (
+                  <p
+                    className={`text-[10.5px] leading-snug pt-0.5 ${
+                      isPerfumeTheme
+                        ? isPerfumeMujer
+                          ? "text-[#7E3B59]"
+                          : "text-[#355E4D]"
+                        : "text-[#546885]"
+                    }`}
+                  >
+                    El envío es una estimación; el precio final se debe acordar en WhatsApp.
+                  </p>
+                )}
+                {!selectedZone && coverageEstimate && !coverageEstimate.withinCoverage && (
+                  <p
+                    className={`text-[10.5px] leading-snug pt-0.5 ${
+                      isPerfumeTheme
+                        ? isPerfumeMujer
+                          ? "text-[#7E3B59]"
+                          : "text-[#355E4D]"
+                        : "text-amber-700"
+                    }`}
+                  >
+                    Supera los {coverageEstimate.maxCoverageKm.toFixed(0)} km: no se puede hacer el envío (consulta en WhatsApp).
+                  </p>
+                )}
               </div>
 
               {canBuyDirect ? (
@@ -1193,7 +1419,9 @@ export default function CartDrawer() {
                   onClick={closeCart}
                   className={
                     isPerfumeTheme
-                      ? "w-full flex items-center justify-center gap-2 py-3.5 text-sm font-bold uppercase tracking-wider rounded-xl bg-[#5B0A1E] hover:bg-[#7A102B] text-[#FFF8F6] shadow-[0_8px_22px_rgba(91,10,30,0.22)] transition-colors"
+                      ? isPerfumeMujer
+                        ? "font-playfair w-full flex items-center justify-center gap-2 py-3.5 text-sm font-bold uppercase tracking-wider rounded-xl bg-[#A62660] hover:bg-[#C23273] text-[#FFF8FB] shadow-[0_8px_22px_rgba(166,38,96,0.22)] transition-colors"
+                        : "font-playfair w-full flex items-center justify-center gap-2 py-3.5 text-sm font-bold uppercase tracking-wider rounded-xl bg-[#0B4A31] hover:bg-[#116443] text-[#F7FBF9] shadow-[0_8px_22px_rgba(11,74,49,0.22)] transition-colors"
                       : "btn-gotech w-full flex items-center justify-center gap-2 py-3.5 text-sm"
                   }
                 >
@@ -1206,7 +1434,9 @@ export default function CartDrawer() {
                   onClick={handleMissingSelection}
                   className={
                     isPerfumeTheme
-                      ? "w-full flex items-center justify-center gap-2 py-3.5 text-sm font-bold uppercase tracking-wider rounded-xl bg-[#5B0A1E] hover:bg-[#7A102B] text-[#FFF8F6] shadow-[0_8px_22px_rgba(91,10,30,0.22)] transition-colors"
+                      ? isPerfumeMujer
+                        ? "font-playfair w-full flex items-center justify-center gap-2 py-3.5 text-sm font-bold uppercase tracking-wider rounded-xl bg-[#A62660] hover:bg-[#C23273] text-[#FFF8FB] shadow-[0_8px_22px_rgba(166,38,96,0.22)] transition-colors"
+                        : "font-playfair w-full flex items-center justify-center gap-2 py-3.5 text-sm font-bold uppercase tracking-wider rounded-xl bg-[#0B4A31] hover:bg-[#116443] text-[#F7FBF9] shadow-[0_8px_22px_rgba(11,74,49,0.22)] transition-colors"
                       : "btn-gotech w-full flex items-center justify-center gap-2 py-3.5 text-sm"
                   }
                 >
@@ -1219,7 +1449,9 @@ export default function CartDrawer() {
                 onClick={clearCart}
                 className={`w-full text-xs font-semibold transition-colors py-1 ${
                   isPerfumeTheme
-                    ? "text-[#8E6971] hover:text-red-700"
+                    ? isPerfumeMujer
+                      ? "text-[#9F5977] hover:text-red-700"
+                      : "text-[#4D7866] hover:text-red-700"
                     : "text-[#7A8CA8] hover:text-red-600"
                 }`}
               >
