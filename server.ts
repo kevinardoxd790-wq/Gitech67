@@ -24,7 +24,16 @@ interface HistoryItemInput {
   text: string;
 }
 
-const AI_TIMEOUT_MS = 20000;
+interface DeliveryContextInput {
+  hasLocation?: boolean;
+  customerAddress?: string;
+  distanceKm?: number;
+  withinCoverage?: boolean;
+  coverageStatus?: string;
+  estimatedShippingUsd?: number;
+}
+
+const AI_TIMEOUT_MS = 14000;
 
 function extractJsonObject(rawText: string): Record<string, unknown> {
   const cleaned = rawText
@@ -108,12 +117,66 @@ async function startServer() {
         })
         .join("\n");
 
+      const rawDelivery = body.deliveryContext as
+        | DeliveryContextInput
+        | undefined;
+      let deliveryContextBlock = "";
+      try {
+        if (rawDelivery && rawDelivery.hasLocation) {
+          const parts: string[] = [];
+          if (
+            typeof rawDelivery.customerAddress === "string" &&
+            rawDelivery.customerAddress.trim()
+          ) {
+            parts.push(
+              `Ubicación del cliente: ${rawDelivery.customerAddress
+                .trim()
+                .slice(0, 140)}`
+            );
+          }
+          if (typeof rawDelivery.distanceKm === "number") {
+            parts.push(
+              `Distancia calculada: ${rawDelivery.distanceKm.toFixed(2)} km`
+            );
+          }
+          if (typeof rawDelivery.coverageStatus === "string") {
+            parts.push(
+              `Estado de cobertura: ${rawDelivery.coverageStatus.slice(0, 120)}`
+            );
+          }
+          if (typeof rawDelivery.estimatedShippingUsd === "number") {
+            const snapped = Math.max(
+              1,
+              Math.round((rawDelivery.estimatedShippingUsd + Number.EPSILON) * 2) / 2
+            );
+            const cleanPrice = Number.isInteger(snapped)
+              ? `$${snapped}`
+              : `$${snapped.toFixed(2)}`;
+            parts.push(
+              `Envío aproximado calculado: ${cleanPrice} USD${
+                rawDelivery.withinCoverage === false
+                  ? " (referencial; fuera de cobertura directa > 5 km, coordinar por WhatsApp)"
+                  : ""
+              }`
+            );
+          }
+          if (parts.length > 0) {
+            deliveryContextBlock = `\n\nUBICACIÓN Y COBERTURA ACTUAL DEL CLIENTE:\n- ${parts.join(
+              "\n- "
+            )}`;
+          }
+        }
+      } catch {
+        deliveryContextBlock = "";
+      }
+
       const systemInstruction = `Asistente virtual exclusivo de GoTech SV (tienda tech en San Salvador).
 Responde en español claro, directo y amable (máximo 3 oraciones).
 
 LÍMITE ESTRICTO DE TEMAS:
 - Atiende SOLO consultas sobre catálogo GoTech, precios, disponibilidad, envíos en San Salvador, carrito y soporte/problemas o reembolsos de compras GoTech.
 - NUNCA menciones cantidades numéricas de existencias o stock al cliente; solo indica si está Disponible o Agotado.
+- NUNCA menciones ni reveles direcciones de origen internas ni puntos de salida de la tienda; comparte únicamente la información del cliente, distancia calculada, cobertura (límite 5 km) y envío aproximado.
 - PROHIBIDO responder historia (ej. Cristóbal Colón), geografía, tareas escolares, ciencia o cultura general. Para temas ajenos, declina cortésmente y devuelve "acciones": [].
 
 PRECIOS FIJOS (SIN CUPONES NI DESCUENTOS):
@@ -127,9 +190,11 @@ POLÍTICA DE REEMBOLSOS, GARANTÍA Y PROBLEMAS:
 CATÁLOGO REAL:
 ${catalogText || "Sin productos."}
 
-ENVÍOS FIJOS:
+ENVÍOS Y COBERTURA:
 - Envío GRATIS para todos los productos, sin mínimo ni límite de precio, en TODAS las zonas principales: Salvador del Mundo (Gasolinera Texaco), Galerías Escalón, Torre Futura, 75 Av. Norte, Redondel Masferrer y Redondel Luceiro.
 - Colonia Escalón: $1.50 extra.
+- Para ubicación personalizada: cobertura directa hasta 5.0 km con tarifa optimizada en montos limpios de $0.50 en $0.50 (referencia desde ~$1 o $1.50 hasta ~$3.50 USD dentro de 5 km, nunca centavos sueltos como $2.25). Si supera los 5.0 km, está fuera de cobertura directa y debe coordinarse por WhatsApp.
+- Si existe "UBICACIÓN Y COBERTURA ACTUAL DEL CLIENTE" abajo, DEBES responder indicando la ubicación del cliente, la distancia calculada en km, el estado de cobertura y el monto exacto del envío aproximado (en formato $1, $1.50, $2, $2.50, etc.). Si el cliente pregunta cuánto cuesta el envío sin indicar dirección, menciona las zonas gratis, Colonia Escalón ($1.50), el rango limpio por km dentro de 5 km ($1 a $3.50) e invítalo a escribir su colonia o dirección aquí mismo para calcularle su costo exacto.${deliveryContextBlock}
 
 FORMATO JSON OBLIGATORIO:
 { "respuesta": "...", "acciones": [...] }
@@ -371,6 +436,261 @@ FORMATO JSON OBLIGATORIO:
         error: isAbort
           ? "La consulta tardó demasiado."
           : "No se pudo procesar la consulta con Gemini.",
+      });
+    }
+  });
+
+  // Geocodificación segura para resolver direcciones del cliente en San Salvador
+  app.get("/api/geocode", async (req, res) => {
+    try {
+      const rawQ = typeof req.query.q === "string" ? req.query.q.trim() : "";
+      if (!rawQ) {
+        return res.status(400).json({ error: "Dirección vacía" });
+      }
+      const buildQuery = (text: string) =>
+        text.toLowerCase().includes("salvador")
+          ? text
+          : `${text}, San Salvador, El Salvador`;
+
+      const fetchNominatim = async (text: string) => {
+        const controller = new AbortController();
+        const timeoutId = setTimeout(() => controller.abort(), 3500);
+        try {
+          const nominatimUrl = `https://nominatim.openstreetmap.org/search?format=json&limit=1&countrycodes=sv&q=${encodeURIComponent(
+            buildQuery(text)
+          )}`;
+          const geoRes = await fetch(nominatimUrl, {
+            signal: controller.signal,
+            headers: {
+              "User-Agent": "GoTechSV-DeliveryCalc/1.0",
+              Accept: "application/json",
+            },
+          });
+          if (!geoRes.ok) return null;
+          const results = await geoRes.json();
+          if (!Array.isArray(results) || results.length === 0) return null;
+          const lat = Number(results[0]?.lat);
+          const lng = Number(results[0]?.lon);
+          if (!Number.isFinite(lat) || !Number.isFinite(lng)) return null;
+          return { lat, lng };
+        } finally {
+          clearTimeout(timeoutId);
+        }
+      };
+
+      let coords = await fetchNominatim(rawQ);
+      if (!coords) {
+        const simplified = rawQ
+          .replace(/#\s*\d+[a-z]?/gi, "")
+          .replace(/\b(?:casa|pasaje|psj|block|poligono|polígono|apto|local)\s*[a-z0-9-]*/gi, "")
+          .replace(/\s+/g, " ")
+          .trim();
+        if (simplified && simplified !== rawQ) {
+          coords = await fetchNominatim(simplified);
+        }
+      }
+
+      if (!coords) {
+        return res.status(404).json({ error: "Sin resultados" });
+      }
+      return res.json(coords);
+    } catch {
+      return res.status(502).json({ error: "Error de geocodificación" });
+    }
+  });
+
+  // Cotización inteligente de envío con Gemini 3.1: precio atractivo al cliente, pago justo al repartidor y margen sostenible
+  app.post("/api/ai/shipping-quote", async (req, res) => {
+    try {
+      const apiKey = process.env.GEMINI_API_KEY;
+      if (!apiKey) {
+        return res.status(503).json({
+          error: "Servicio de IA no configurado en el servidor.",
+        });
+      }
+
+      const body = req.body ?? {};
+      const distanceKm = Number(body.distanceKm);
+      const subtotal = Number(body.subtotal ?? 0);
+      const itemCount = Number(body.itemCount ?? 1);
+      const withinCoverage = Boolean(body.withinCoverage);
+      const baseShippingUsd = Number(body.baseShippingUsd ?? 0);
+      const customerAddress =
+        typeof body.customerAddress === "string"
+          ? body.customerAddress.trim().slice(0, 140)
+          : "";
+
+      if (!Number.isFinite(distanceKm) || distanceKm < 0) {
+        return res.status(400).json({ error: "Distancia inválida." });
+      }
+
+      const safeSubtotal =
+        Number.isFinite(subtotal) && subtotal >= 0 ? subtotal : 0;
+      const safeItemCount =
+        Number.isFinite(itemCount) && itemCount >= 1
+          ? Math.round(itemCount)
+          : 1;
+      const safeBase =
+        Number.isFinite(baseShippingUsd) && baseShippingUsd >= 0
+          ? baseShippingUsd
+          : Math.round((0.5 + distanceKm * 0.6) * 100) / 100;
+
+      const ai = getAiClient(apiKey);
+
+      const round2 = (n: number) =>
+        Math.round((n + Number.EPSILON) * 100) / 100;
+
+      const systemInstruction = `Eres el motor de cálculo logístico y precios de envío de GoTech SV en San Salvador, El Salvador.
+Debes calcular un desglose justo y equilibrado en USD considerando:
+1. PRECIO EXCELENTE AL CONSUMIDOR: Tarifa competitiva, clara y atractiva para el cliente según su distancia y monto de compra, que incentive a completar el pedido sin sentirse caro.
+2. COMPENSACIÓN JUSTA AL REPARTIDOR: Debe cubrir combustible, desgaste de moto/vehículo, tiempo en tráfico de San Salvador y entrega en mano (proporcional a la distancia).
+3. GANANCIA SOSTENIBLE PARA LA TIENDA: Debe dejar un margen operativo positivo razonable para GoTech SV sobre el servicio de envío.
+
+REGLAS ESTRICTAS:
+- MONTO LIMPIO SIN CENTAVOS SUELTOS: "shippingPriceUsd" DEBE ser SIEMPRE un múltiplo exacto de $0.50 USD (únicamente valores como 1, 1.5, 2, 2.5, 3, 3.5, 4, etc.; PROHIBIDO usar centavos sueltos como 1.25, 1.75, 2.15 o 2.25).
+- CERO cupones, códigos promocionales ni descuentos sobre los productos.
+- NUNCA menciones direcciones de origen ni puntos de partida de la tienda.
+- Coherencia matemática obligatoria: shippingPriceUsd = driverCompensationUsd + storeMarginUsd (todos > 0).
+- Si withinCoverage es false (> 5.0 km), calcula un estimado referencial en múltiplos de $0.50 aclarando que supera los 5 km de cobertura directa y debe coordinarse por WhatsApp.
+- Responde en español breve, profesional y claro.`;
+
+      const userPrompt = JSON.stringify({
+        distanceKm: round2(distanceKm),
+        withinCoverage,
+        maxDirectCoverageKm: 5.0,
+        orderSubtotalUsd: round2(safeSubtotal),
+        itemCount: safeItemCount,
+        referenceBaselineUsd: round2(safeBase),
+        customerZoneOrAddress: customerAddress || "Ubicación personalizada",
+      });
+
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 14000);
+      let response;
+      try {
+        response = await ai.models.generateContent({
+          model: "gemini-3.1-flash-lite",
+          contents: [
+            {
+              role: "user",
+              parts: [
+                {
+                  text: `Calcula el costo óptimo de envío, pago al repartidor y ganancia operativa para este pedido:\n${userPrompt}`,
+                },
+              ],
+            },
+          ],
+          config: {
+            systemInstruction,
+            thinkingConfig: { thinkingLevel: ThinkingLevel.MINIMAL },
+            responseMimeType: "application/json",
+            abortSignal: controller.signal,
+            responseSchema: {
+              type: Type.OBJECT,
+              properties: {
+                shippingPriceUsd: {
+                  type: Type.NUMBER,
+                  description:
+                    "Precio final excelente para el consumidor en USD (2 decimales).",
+                },
+                driverCompensationUsd: {
+                  type: Type.NUMBER,
+                  description:
+                    "Pago justo destinado al repartidor en USD (2 decimales).",
+                },
+                storeMarginUsd: {
+                  type: Type.NUMBER,
+                  description:
+                    "Ganancia o margen operativo que queda para la tienda en USD (2 decimales).",
+                },
+                consumerSummary: {
+                  type: Type.STRING,
+                  description:
+                    "Explicación breve y amigable para el consumidor (máx 1 oración).",
+                },
+                pricingNote: {
+                  type: Type.STRING,
+                  description:
+                    "Nota breve sobre equilibrio entre consumidor, repartidor y ganancia (máx 1 oración).",
+                },
+              },
+              required: [
+                "shippingPriceUsd",
+                "driverCompensationUsd",
+                "storeMarginUsd",
+                "consumerSummary",
+                "pricingNote",
+              ],
+            },
+          },
+        });
+      } finally {
+        clearTimeout(timeoutId);
+      }
+
+      const rawText = (response.text ?? "").trim();
+      const parsed = extractJsonObject(rawText);
+
+      const rawDriver = Number(parsed?.driverCompensationUsd);
+      const rawMargin = Number(parsed?.storeMarginUsd);
+      const rawTotal = Number(parsed?.shippingPriceUsd);
+
+      if (
+        !Number.isFinite(rawDriver) ||
+        !Number.isFinite(rawMargin) ||
+        !Number.isFinite(rawTotal) ||
+        rawDriver <= 0 ||
+        rawMargin <= 0 ||
+        rawTotal <= 0
+      ) {
+        return res.status(502).json({
+          error: "La IA devolvió montos inválidos para el cálculo de envío.",
+        });
+      }
+
+      const shippingPriceUsd = Math.max(
+        1,
+        Math.round((rawTotal + Number.EPSILON) * 2) / 2
+      );
+      const ratio = rawDriver / (rawDriver + rawMargin);
+      const driverCompensationUsd = round2(
+        Math.max(0.5, shippingPriceUsd * ratio)
+      );
+      const storeMarginUsd = round2(
+        Math.max(0.1, shippingPriceUsd - driverCompensationUsd)
+      );
+
+      const consumerSummary =
+        typeof parsed?.consumerSummary === "string" &&
+        parsed.consumerSummary.trim()
+          ? parsed.consumerSummary.trim().slice(0, 180)
+          : "Tarifa optimizada por distancia con entrega rápida y pago justo al repartidor.";
+
+      const pricingNote =
+        typeof parsed?.pricingNote === "string" && parsed.pricingNote.trim()
+          ? parsed.pricingNote.trim().slice(0, 200)
+          : "Equilibra un precio accesible para el cliente, pago justo al repartidor y margen operativo.";
+
+      return res.json({
+        shippingPriceUsd,
+        driverCompensationUsd,
+        storeMarginUsd,
+        consumerSummary,
+        pricingNote,
+        model: "gemini-3.1-flash-lite",
+      });
+    } catch (error) {
+      const isAbort =
+        error instanceof Error &&
+        (error.name === "AbortError" ||
+          error.message.toLowerCase().includes("abort"));
+      if (res.headersSent || res.writableEnded) {
+        return;
+      }
+      return res.status(isAbort ? 504 : 502).json({
+        error: isAbort
+          ? "El cálculo de envío con IA tardó demasiado."
+          : "No se pudo calcular la tarifa optimizada con Gemini 3.1.",
       });
     }
   });

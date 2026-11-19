@@ -14,7 +14,25 @@ import { useCart } from "@/hooks/useCart";
 import { usePerfumeZone } from "@/hooks/usePerfumeZone";
 import { ejecutarAccionesIA, AIRespuestaJSON } from "@/lib/aiExecutor";
 import { onOpenAiAssistant } from "@/lib/aiBridge";
+import {
+  buildAiShippingCacheKey,
+  calcularCoberturaEnvioSeguro,
+  extraerDestinoDeConsulta,
+  formatEnvioUsd,
+  geocodificarDireccionCliente,
+  getCachedAiShippingQuote,
+  solicitarCotizacionEnvioIA,
+} from "@/lib/deliveryCoverage";
 import { Product } from "@/types";
+
+interface DeliveryContextPayload {
+  hasLocation: boolean;
+  customerAddress?: string;
+  distanceKm?: number;
+  withinCoverage?: boolean;
+  coverageStatus?: string;
+  estimatedShippingUsd?: number;
+}
 
 const SUPPORT_WHATSAPP_NUMBER = "50376299724";
 const REFUND_POLICY_TEXT =
@@ -59,7 +77,8 @@ function isRefundOrProblemQuery(queryText: string): boolean {
  */
 function generarRespuestaRespaldoLocal(
   queryText: string,
-  products: Product[]
+  products: Product[],
+  deliveryContext?: DeliveryContextPayload | null
 ): AIRespuestaJSON {
   try {
     const q = queryText.toLowerCase().trim();
@@ -104,11 +123,44 @@ function generarRespuestaRespaldoLocal(
 
     if (
       !wantsAdd &&
-      (q.includes("envio") || q.includes("envío") || q.includes("zona"))
+      (q.includes("envio") ||
+        q.includes("envío") ||
+        q.includes("zona") ||
+        q.includes("cobertura") ||
+        q.includes("distancia") ||
+        q.includes("km") ||
+        q.includes("kilometro") ||
+        q.includes("kilómetro") ||
+        q.includes("ubicacion") ||
+        q.includes("ubicación"))
     ) {
+      if (
+        deliveryContext?.hasLocation &&
+        typeof deliveryContext.distanceKm === "number" &&
+        typeof deliveryContext.estimatedShippingUsd === "number"
+      ) {
+        const locPart = deliveryContext.customerAddress
+          ? `Para tu ubicación (${deliveryContext.customerAddress}), `
+          : "Para tu ubicación seleccionada, ";
+        const kmText = `${deliveryContext.distanceKm.toFixed(2)} km`;
+        const priceText = `~${formatEnvioUsd(
+          deliveryContext.estimatedShippingUsd
+        )} USD`;
+        if (deliveryContext.withinCoverage) {
+          return {
+            respuesta: `${locPart}la distancia es de ${kmText}, estás dentro de cobertura (límite 5 km) y el envío calculado es de ${priceText}. Además, Salvador del Mundo (Texaco), Galerías, Torre Futura, 75 Av. Norte, Masferrer y Luceiro tienen envío gratis.`,
+            acciones: [],
+          };
+        }
+        return {
+          respuesta: `${locPart}la distancia es de ${kmText}, supera el límite de 5 km (fuera de cobertura directa) con un estimado referencial de ${priceText}; el envío se coordina por WhatsApp.`,
+          acciones: [],
+        };
+      }
+
       return {
         respuesta:
-          "¡El envío es GRATIS para todos los productos sin mínimo de compra! Incluye Salvador del Mundo (Gasolinera Texaco), Galerías Escalón, Torre Futura, 75 Av. Norte, Redondel Masferrer y Redondel Luceiro (Colonia Escalón $1.50).",
+          "¡El envío es GRATIS en Salvador del Mundo (Texaco), Galerías Escalón, Torre Futura, 75 Av. Norte, Redondel Masferrer y Redondel Luceiro (Colonia Escalón $1.50)! Para otras zonas dentro de 5 km el envío calculado es desde ~$1 o $1.50 hasta ~$3.50 USD según distancia. Escríbeme aquí tu colonia o dirección (ej: 'envío a Metrocentro') para darte el costo exacto.",
         acciones: [],
       };
     }
@@ -294,7 +346,8 @@ export default function AiAssistantWidget() {
   const isAdminTheme = location.pathname.startsWith("/admin");
 
   const { products } = useCatalog();
-  const { addToCart, openCart } = useCart();
+  const { addToCart, openCart, address, coordinates, totalPrice, totalItems } =
+    useCart();
 
   const [isOpen, setIsOpen] = useState(false);
   const [input, setInput] = useState("");
@@ -388,7 +441,88 @@ export default function AiAssistantWidget() {
     }
 
     const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), 22000);
+    const timeoutId = setTimeout(() => controller.abort(), 16000);
+
+    let deliveryContext: DeliveryContextPayload | undefined;
+    try {
+      const lowerTrimmed = trimmed.toLowerCase();
+      const isShippingQuery =
+        lowerTrimmed.includes("envio") ||
+        lowerTrimmed.includes("envío") ||
+        lowerTrimmed.includes("cobertura") ||
+        lowerTrimmed.includes("distancia") ||
+        lowerTrimmed.includes("km") ||
+        lowerTrimmed.includes("kilometro") ||
+        lowerTrimmed.includes("kilómetro") ||
+        lowerTrimmed.includes("ubicacion") ||
+        lowerTrimmed.includes("ubicación") ||
+        lowerTrimmed.includes("entrega");
+
+      const destinationInMsg = isShippingQuery
+        ? extraerDestinoDeConsulta(trimmed)
+        : null;
+
+      let targetCoords = coordinates;
+      let targetAddress = address.trim();
+
+      if (destinationInMsg) {
+        const resolvedMsgCoords =
+          await geocodificarDireccionCliente(destinationInMsg);
+        if (resolvedMsgCoords) {
+          targetCoords = resolvedMsgCoords;
+          targetAddress = destinationInMsg;
+        }
+      } else if (!targetCoords && targetAddress) {
+        const resolvedSavedCoords =
+          await geocodificarDireccionCliente(targetAddress);
+        if (resolvedSavedCoords) {
+          targetCoords = resolvedSavedCoords;
+        }
+      }
+
+      const coverage = calcularCoberturaEnvioSeguro(targetCoords);
+      let resolvedShippingUsd = coverage?.estimatedShippingUsd;
+
+      if (coverage) {
+        const cachedQuote = getCachedAiShippingQuote(
+          buildAiShippingCacheKey({
+            distanceKm: coverage.distanceKm,
+            subtotal: totalPrice,
+            itemCount: totalItems,
+          })
+        );
+        if (cachedQuote) {
+          resolvedShippingUsd = cachedQuote.shippingPriceUsd;
+        } else if (isShippingQuery) {
+          const quoteRes = await solicitarCotizacionEnvioIA({
+            coverage,
+            subtotal: totalPrice,
+            itemCount: totalItems,
+            customerAddress: targetAddress,
+          });
+          if (quoteRes.quote) {
+            resolvedShippingUsd = quoteRes.quote.shippingPriceUsd;
+          }
+        }
+      }
+
+      if (coverage || targetAddress) {
+        deliveryContext = {
+          hasLocation: true,
+          ...(targetAddress ? { customerAddress: targetAddress } : {}),
+          ...(coverage
+            ? {
+                distanceKm: coverage.distanceKm,
+                withinCoverage: coverage.withinCoverage,
+                coverageStatus: coverage.statusLabel,
+                estimatedShippingUsd: resolvedShippingUsd,
+              }
+            : {}),
+        };
+      }
+    } catch {
+      deliveryContext = undefined;
+    }
 
     try {
       const catalogPayload = products.map((p, idx) => ({
@@ -409,6 +543,7 @@ export default function AiAssistantWidget() {
           message: trimmed,
           catalog: catalogPayload,
           history: historyPayload,
+          deliveryContext,
         }),
       });
 
@@ -448,7 +583,11 @@ export default function AiAssistantWidget() {
       ]);
     } catch {
       try {
-        const fallback = generarRespuestaRespaldoLocal(trimmed, products);
+        const fallback = generarRespuestaRespaldoLocal(
+          trimmed,
+          products,
+          deliveryContext
+        );
         let hasRefundAction = false;
         ejecutarAccionesIA(fallback, {
           products,

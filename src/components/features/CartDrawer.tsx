@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useRef, useMemo } from "react";
 import { useLocation } from "react-router-dom";
 import {
   X,
@@ -13,8 +13,10 @@ import {
   Search,
   ChevronDown,
   ChevronUp,
+  CheckCircle2,
+  AlertTriangle,
 } from "lucide-react";
-import { useCart, Coordinates } from "@/hooks/useCart";
+import { useCart } from "@/hooks/useCart";
 import { useCatalog } from "@/hooks/useCatalog";
 import {
   getShippingZones,
@@ -22,26 +24,14 @@ import {
   isPerfumeProduct,
 } from "@/constants/products";
 import { generarEnlaceWhatsAppSeguro } from "@/lib/whatsapp";
-
-function extractCoordinates(text: string): Coordinates | null {
-  try {
-    const match = text.match(/(-?\d{1,3}\.\d+)\s*,\s*(-?\d{1,3}\.\d+)/);
-    if (!match) return null;
-    const lat = Number(match[1]);
-    const lng = Number(match[2]);
-    if (
-      Number.isFinite(lat) &&
-      Number.isFinite(lng) &&
-      Math.abs(lat) <= 90 &&
-      Math.abs(lng) <= 180
-    ) {
-      return { lat, lng };
-    }
-    return null;
-  } catch {
-    return null;
-  }
-}
+import {
+  AiShippingQuote,
+  calcularCoberturaEnvioSeguro,
+  extractCoordinatesFromInput,
+  formatEnvioUsd,
+  geocodificarDireccionCliente,
+  solicitarCotizacionEnvioIA,
+} from "@/lib/deliveryCoverage";
 
 export default function CartDrawer() {
   const location = useLocation();
@@ -80,9 +70,14 @@ export default function CartDrawer() {
 
   const [selectedZone, setSelectedZone] = useState<string>("");
   const [zoneError, setZoneError] = useState(false);
-  const [showCustomLocation, setShowCustomLocation] = useState(false);
+  const [showCustomLocation, setShowCustomLocation] = useState(
+    Boolean(address.trim() || coordinates)
+  );
   const [locating, setLocating] = useState(false);
+  const [searchingGeo, setSearchingGeo] = useState(false);
   const [geoError, setGeoError] = useState("");
+  const [addressNotFound, setAddressNotFound] = useState(false);
+  const [aiQuote, setAiQuote] = useState<AiShippingQuote | null>(null);
   const [mapQuery, setMapQuery] = useState(
     coordinates
       ? `${coordinates.lat.toFixed(6)}, ${coordinates.lng.toFixed(6)}`
@@ -90,11 +85,138 @@ export default function CartDrawer() {
   );
 
   const zoneSectionRef = useRef<HTMLDivElement>(null);
+  const lastAutoGeocodedRef = useRef<string>("");
 
   const shippingZones = getShippingZones(totalPrice, totalItems);
   const freeZones = shippingZones.filter((z) => z.cost === 0);
   const paidZones = shippingZones.filter((z) => z.cost > 0);
   const shippingLabel = getShippingLabel(totalPrice, totalItems);
+
+  const coverageEstimate = useMemo(() => {
+    try {
+      return calcularCoberturaEnvioSeguro(coordinates);
+    } catch {
+      return null;
+    }
+  }, [coordinates]);
+
+  useEffect(() => {
+    try {
+      if (coordinates) {
+        setMapQuery(
+          `${coordinates.lat.toFixed(6)}, ${coordinates.lng.toFixed(6)}`
+        );
+        setAddressNotFound(false);
+      }
+    } catch {
+      // Ignora error de sincronización de mapa
+    }
+  }, [coordinates]);
+
+  useEffect(() => {
+    if (isOpen && (address.trim() || coordinates) && !selectedZone) {
+      setShowCustomLocation(true);
+    }
+  }, [isOpen, address, coordinates, selectedZone]);
+
+  // Auto-geocodifica direcciones escritas para mostrar cobertura y costo sin requerir doble clic
+  useEffect(() => {
+    if (!isOpen) return;
+    const trimmed = address.trim();
+    if (trimmed.length < 3) {
+      setAddressNotFound(false);
+      return;
+    }
+    if (trimmed === lastAutoGeocodedRef.current && coordinates) {
+      return;
+    }
+
+    let cancelled = false;
+    const timer = window.setTimeout(async () => {
+      try {
+        const direct = extractCoordinatesFromInput(trimmed);
+        if (direct) {
+          if (cancelled) return;
+          lastAutoGeocodedRef.current = trimmed;
+          setLocation(trimmed, direct);
+          setMapQuery(`${direct.lat.toFixed(6)}, ${direct.lng.toFixed(6)}`);
+          setSelectedZone("");
+          setAddressNotFound(false);
+          return;
+        }
+
+        const resolved = await geocodificarDireccionCliente(trimmed);
+        if (cancelled) return;
+        lastAutoGeocodedRef.current = trimmed;
+        if (resolved) {
+          setLocation(trimmed, resolved);
+          setMapQuery(`${resolved.lat.toFixed(6)}, ${resolved.lng.toFixed(6)}`);
+          setSelectedZone("");
+          setAddressNotFound(false);
+        } else {
+          setAddressNotFound(true);
+        }
+      } catch {
+        // No interrumpe la escritura si falla la geocodificación automática
+      }
+    }, 550);
+
+    return () => {
+      cancelled = true;
+      window.clearTimeout(timer);
+    };
+  }, [isOpen, address, coordinates, setLocation]);
+
+  const coverageDistanceKey = coverageEstimate?.distanceKm ?? null;
+  const coverageWithinKey = coverageEstimate?.withinCoverage ?? null;
+
+  useEffect(() => {
+    if (
+      !isOpen ||
+      coverageDistanceKey === null ||
+      !coverageEstimate ||
+      items.length === 0
+    ) {
+      if (!coverageEstimate) {
+        setAiQuote(null);
+      }
+      return;
+    }
+    let cancelled = false;
+    const timer = window.setTimeout(async () => {
+      try {
+        const result = await solicitarCotizacionEnvioIA({
+          coverage: coverageEstimate,
+          subtotal: totalPrice,
+          itemCount: totalItems,
+          customerAddress: address,
+        });
+        if (cancelled) return;
+        if (result.quote) {
+          setAiQuote(result.quote);
+        } else {
+          setAiQuote(null);
+        }
+      } catch {
+        if (!cancelled) {
+          setAiQuote(null);
+        }
+      }
+    }, 150);
+
+    return () => {
+      cancelled = true;
+      window.clearTimeout(timer);
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [
+    isOpen,
+    coverageDistanceKey,
+    coverageWithinKey,
+    items.length,
+    totalPrice,
+    totalItems,
+  ]);
 
   useEffect(() => {
     if (selectedZone && !shippingZones.some((z) => z.name === selectedZone)) {
@@ -106,61 +228,114 @@ export default function CartDrawer() {
 
   const selectedZoneObj = shippingZones.find((z) => z.name === selectedZone);
   const shippingCost = selectedZoneObj?.cost ?? null;
+  const effectiveCustomShippingUsd = aiQuote
+    ? aiQuote.shippingPriceUsd
+    : coverageEstimate
+      ? coverageEstimate.estimatedShippingUsd
+      : null;
+  const approxCustomShipping =
+    shippingCost === null ? effectiveCustomShippingUsd : null;
   const totalWithShipping =
-    shippingCost !== null ? totalPrice + shippingCost : totalPrice;
+    shippingCost !== null
+      ? totalPrice + shippingCost
+      : approxCustomShipping !== null
+        ? totalPrice + approxCustomShipping
+        : totalPrice;
 
   const hasCustomLocation = Boolean(address.trim() || coordinates);
   const canBuyDirect = Boolean(selectedZone || hasCustomLocation);
 
   function handleUseLocation() {
-    setGeoError("");
-    if (!navigator.geolocation) {
-      setGeoError(
-        "Tu navegador no soporta geolocalización. Escribe tu dirección y presiona Buscar mi dirección."
-      );
-      return;
-    }
-    setLocating(true);
-    navigator.geolocation.getCurrentPosition(
-      (pos) => {
-        const { latitude, longitude } = pos.coords;
-        const formatted = `${latitude.toFixed(6)}, ${longitude.toFixed(6)}`;
-        const currentAddr = address.trim();
-        const isCurrentRawCoords = /^-?\d{1,3}\.\d+\s*,\s*-?\d{1,3}\.\d+$/.test(
-          currentAddr
-        );
-        const preservedAddress =
-          currentAddr && !isCurrentRawCoords ? currentAddr : "";
-        setLocation(preservedAddress, { lat: latitude, lng: longitude });
-        setMapQuery(formatted);
-        setZoneError(false);
-        setLocating(false);
-      },
-      () => {
-        setLocating(false);
+    try {
+      setGeoError("");
+      setAddressNotFound(false);
+      if (!navigator.geolocation) {
         setGeoError(
-          "No se pudo obtener tu ubicación. Escribe tu dirección y presiona Buscar mi dirección."
+          "Tu navegador no soporta geolocalización. Escribe tu dirección y presiona Buscar mi dirección."
         );
+        return;
       }
-    );
+      setLocating(true);
+      navigator.geolocation.getCurrentPosition(
+        (pos) => {
+          try {
+            const { latitude, longitude } = pos.coords;
+            const formatted = `${latitude.toFixed(6)}, ${longitude.toFixed(
+              6
+            )}`;
+            const currentAddr = address.trim();
+            const isCurrentRawCoords =
+              /^-?\d{1,3}\.\d+\s*,\s*-?\d{1,3}\.\d+$/.test(currentAddr);
+            const preservedAddress =
+              currentAddr && !isCurrentRawCoords ? currentAddr : "";
+            lastAutoGeocodedRef.current = preservedAddress;
+            setLocation(preservedAddress, { lat: latitude, lng: longitude });
+            setMapQuery(formatted);
+            setSelectedZone("");
+            setZoneError(false);
+          } catch {
+            setGeoError(
+              "No se pudo procesar tu ubicación. Intenta buscar tu dirección."
+            );
+          } finally {
+            setLocating(false);
+          }
+        },
+        () => {
+          setLocating(false);
+          setGeoError(
+            "No se pudo obtener tu ubicación GPS. Escribe tu colonia o dirección arriba y presiona Buscar mi dirección."
+          );
+        }
+      );
+    } catch {
+      setLocating(false);
+      setGeoError(
+        "No se pudo iniciar la geolocalización. Escribe tu dirección y presiona Buscar mi dirección."
+      );
+    }
   }
 
-  function handleSearchAddress() {
-    setGeoError("");
-    const trimmed = address.trim();
-    if (!trimmed) {
-      setGeoError("Escribe una dirección para buscarla en el mapa.");
-      return;
+  async function handleSearchAddress() {
+    try {
+      setGeoError("");
+      setAddressNotFound(false);
+      const trimmed = address.trim();
+      if (!trimmed) {
+        setGeoError("Escribe una dirección para buscarla en el mapa.");
+        return;
+      }
+      const parsed = extractCoordinatesFromInput(trimmed);
+      if (parsed) {
+        lastAutoGeocodedRef.current = trimmed;
+        setLocation(trimmed, parsed);
+        setMapQuery(`${parsed.lat.toFixed(6)}, ${parsed.lng.toFixed(6)}`);
+        setSelectedZone("");
+        setZoneError(false);
+        return;
+      }
+
+      setSearchingGeo(true);
+      const resolved = await geocodificarDireccionCliente(trimmed);
+      lastAutoGeocodedRef.current = trimmed;
+      if (resolved) {
+        setLocation(trimmed, resolved);
+        setMapQuery(`${resolved.lat.toFixed(6)}, ${resolved.lng.toFixed(6)}`);
+        setSelectedZone("");
+        setAddressNotFound(false);
+      } else {
+        setLocation(trimmed, null);
+        setMapQuery(`${trimmed}, San Salvador, El Salvador`);
+        setAddressNotFound(true);
+      }
+      setZoneError(false);
+    } catch {
+      setGeoError(
+        "No se pudo ubicar la dirección exacta. Prueba usando tu GPS o pegando un enlace de Google Maps."
+      );
+    } finally {
+      setSearchingGeo(false);
     }
-    const parsed = extractCoordinates(trimmed);
-    if (parsed) {
-      setLocation(trimmed, parsed);
-      setMapQuery(`${parsed.lat.toFixed(6)}, ${parsed.lng.toFixed(6)}`);
-    } else {
-      setLocation(trimmed, null);
-      setMapQuery(`${trimmed}, San Salvador, El Salvador`);
-    }
-    setZoneError(false);
   }
 
   const buildWhatsAppLink = () =>
@@ -174,6 +349,8 @@ export default function CartDrawer() {
       shippingCost: selectedZone ? shippingCost : null,
       subtotal: totalPrice,
       totalWithShipping,
+      coverageEstimate,
+      aiQuote,
     });
 
   const handleMissingSelection = () => {
@@ -646,14 +823,28 @@ export default function CartDrawer() {
                         isPerfumeTheme ? "text-[#5B0A1E]" : "text-[#0057FF]"
                       }`}
                     />
-                    <div className="min-w-0">
-                      <p
-                        className={`text-xs font-bold ${
-                          isPerfumeTheme ? "text-[#5B0A1E]" : "text-[#0057FF]"
-                        }`}
-                      >
-                        Seleccionar ubicación personalizada
-                      </p>
+                    <div className="min-w-0 flex-1">
+                      <div className="flex items-center justify-between gap-2">
+                        <p
+                          className={`text-xs font-bold ${
+                            isPerfumeTheme ? "text-[#5B0A1E]" : "text-[#0057FF]"
+                          }`}
+                        >
+                          Seleccionar ubicación personalizada
+                        </p>
+                        {coverageEstimate && effectiveCustomShippingUsd !== null && (
+                          <span
+                            className={`shrink-0 text-[10px] font-bold px-2 py-0.5 rounded-full border ${
+                              coverageEstimate.withinCoverage
+                                ? "bg-emerald-50 border-emerald-200 text-emerald-700"
+                                : "bg-amber-50 border-amber-200 text-amber-700"
+                            }`}
+                          >
+                            {coverageEstimate.distanceKm.toFixed(1)} km · ~
+                            {formatEnvioUsd(effectiveCustomShippingUsd)}
+                          </span>
+                        )}
+                      </div>
                       {(address.trim() || coordinates) && (
                         <p
                           className={`text-[11px] truncate ${
@@ -663,6 +854,11 @@ export default function CartDrawer() {
                           }`}
                         >
                           {address.trim() || "Ubicación GPS seleccionada"}
+                          {coverageEstimate && effectiveCustomShippingUsd !== null
+                            ? ` · Envío aprox.: ~${formatEnvioUsd(
+                                effectiveCustomShippingUsd
+                              )}`
+                            : ""}
                         </p>
                       )}
                     </div>
@@ -710,10 +906,10 @@ export default function CartDrawer() {
                         onKeyDown={(e) => {
                           if (e.key === "Enter") {
                             e.preventDefault();
-                            handleSearchAddress();
+                            void handleSearchAddress();
                           }
                         }}
-                        placeholder="Ej: Col. Escalón, Calle El Pedregal #12"
+                        placeholder="Ej: Col. Escalón, Calle El Pedregal #12 o enlace Maps"
                         className={`w-full border rounded-xl px-3.5 py-2.5 text-xs focus:outline-none transition-colors ${
                           isPerfumeTheme
                             ? "bg-[#FDF9F8] border-[#DFC5BC] text-[#3B0815] placeholder-[#A88B92] focus:border-[#5B0A1E]"
@@ -725,15 +921,20 @@ export default function CartDrawer() {
                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
                       <button
                         type="button"
-                        onClick={handleSearchAddress}
-                        className={`flex items-center justify-center gap-1.5 border rounded-xl py-2.5 px-3 text-xs font-bold transition-all ${
+                        onClick={() => void handleSearchAddress()}
+                        disabled={searchingGeo}
+                        className={`flex items-center justify-center gap-1.5 border rounded-xl py-2.5 px-3 text-xs font-bold transition-all disabled:opacity-50 ${
                           isPerfumeTheme
                             ? "bg-[#FAF0EC] border-[#C9A89D] hover:bg-[#F3DFD8] text-[#5B0A1E]"
                             : "bg-[#EAF2FF] border-[#BFD7FF] hover:bg-[#DCEAFF] text-[#0057FF]"
                         }`}
                       >
-                        <Search className="w-3.5 h-3.5" />
-                        Buscar mi dirección
+                        <Search
+                          className={`w-3.5 h-3.5 ${
+                            searchingGeo ? "animate-pulse" : ""
+                          }`}
+                        />
+                        {searchingGeo ? "Calculando..." : "Buscar mi dirección"}
                       </button>
 
                       <button
@@ -759,6 +960,67 @@ export default function CartDrawer() {
                       <p className="text-[11px] text-center text-amber-700 font-medium">
                         {geoError}
                       </p>
+                    )}
+
+                    {addressNotFound && !coverageEstimate && address.trim().length >= 3 && (
+                      <div className="rounded-xl border border-amber-200 bg-amber-50 p-2.5 text-[11px] text-amber-900 leading-snug">
+                        No ubicamos esa dirección exacta para calcular km.
+                        Agrega tu colonia o punto conocido (ej:{" "}
+                        <strong>Col. Escalón, Metrocentro, Santa Tecla</strong>)
+                        o presiona <strong>Usar mi GPS</strong>.
+                      </div>
+                    )}
+
+                    {/* Resultado limpio de cobertura de 5 km y costo aproximado de envío (sin punto de origen ni desglose interno) */}
+                    {coverageEstimate && (
+                      <div
+                        className={`rounded-xl border p-3 space-y-1.5 ${
+                          coverageEstimate.withinCoverage
+                            ? isPerfumeTheme
+                              ? "bg-emerald-50/80 border-emerald-700/25 text-emerald-950"
+                              : "bg-emerald-50/90 border-emerald-200 text-emerald-950"
+                            : isPerfumeTheme
+                              ? "bg-amber-50/90 border-amber-700/25 text-amber-950"
+                              : "bg-amber-50 border-amber-200 text-amber-950"
+                        }`}
+                      >
+                        <div className="flex items-start gap-2">
+                          {coverageEstimate.withinCoverage ? (
+                            <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0 mt-0.5" />
+                          ) : (
+                            <AlertTriangle className="w-4 h-4 text-amber-600 shrink-0 mt-0.5" />
+                          )}
+                          <div className="min-w-0 flex-1 space-y-0.5">
+                            <p className="text-xs font-bold leading-snug">
+                              {coverageEstimate.statusLabel}
+                            </p>
+                            <div className="flex flex-wrap items-center justify-between gap-x-3 gap-y-1 text-[11px] pt-0.5">
+                              <span className="font-medium opacity-90">
+                                Distancia:{" "}
+                                <strong>
+                                  {coverageEstimate.distanceKm.toFixed(2)} km
+                                </strong>
+                              </span>
+                              <span className="font-bold">
+                                Envío aprox.: ~
+                                {formatEnvioUsd(
+                                  effectiveCustomShippingUsd ??
+                                    coverageEstimate.estimatedShippingUsd
+                                )}{" "}
+                                USD
+                              </span>
+                            </div>
+                            {!coverageEstimate.withinCoverage && (
+                              <p className="text-[10.5px] leading-snug text-amber-800 pt-1">
+                                Tu ubicación supera el límite directo de{" "}
+                                {coverageEstimate.maxCoverageKm.toFixed(0)} km.
+                                El monto mostrado es referencial y el envío debe
+                                coordinarse por WhatsApp.
+                              </p>
+                            )}
+                          </div>
+                        </div>
+                      </div>
                     )}
 
                     {(coordinates || address.trim()) && (
@@ -818,7 +1080,7 @@ export default function CartDrawer() {
                     >
                       <iframe
                         key={mapQuery}
-                        title="Mapa de entrega"
+                        title="Tu ubicación de entrega"
                         src={mapSrc}
                         width="100%"
                         height="100%"
@@ -849,13 +1111,18 @@ export default function CartDrawer() {
                   <span>Subtotal</span>
                   <span>${totalPrice.toFixed(2)}</span>
                 </div>
-                <div className="flex items-center justify-between text-xs">
+                <div className="flex items-center justify-between text-xs gap-2">
                   <span
                     className={
                       isPerfumeTheme ? "text-[#6B4A52]" : "text-[#546885]"
                     }
                   >
-                    Envío {selectedZone ? `(${selectedZone})` : ""}
+                    Envío{" "}
+                    {selectedZone
+                      ? `(${selectedZone})`
+                      : coverageEstimate
+                        ? `aprox. (${coverageEstimate.distanceKm.toFixed(2)} km)`
+                        : ""}
                   </span>
                   <span
                     className={
@@ -863,18 +1130,32 @@ export default function CartDrawer() {
                         ? "text-emerald-700 font-bold"
                         : shippingCost !== null
                           ? "text-amber-700 font-bold"
-                          : isPerfumeTheme
-                            ? "text-[#9A7A82]"
-                            : "text-[#7A8CA8]"
+                          : coverageEstimate
+                            ? coverageEstimate.withinCoverage
+                              ? "text-emerald-700 font-bold"
+                              : "text-amber-700 font-bold"
+                            : isPerfumeTheme
+                              ? "text-[#9A7A82]"
+                              : "text-[#7A8CA8]"
                     }
                   >
                     {shippingCost === 0
                       ? "GRATIS"
                       : shippingCost !== null
-                        ? `+$${shippingCost.toFixed(2)}`
-                        : hasCustomLocation
-                          ? "Por confirmar"
-                          : "Selecciona zona"}
+                        ? `+${
+                            Number.isInteger(shippingCost)
+                              ? `$${shippingCost}`
+                              : `$${shippingCost.toFixed(2)}`
+                          }`
+                        : coverageEstimate && effectiveCustomShippingUsd !== null
+                          ? coverageEstimate.withinCoverage
+                            ? `~${formatEnvioUsd(effectiveCustomShippingUsd)}`
+                            : `~${formatEnvioUsd(
+                                effectiveCustomShippingUsd
+                              )} (coordinar)`
+                          : hasCustomLocation
+                            ? "Por confirmar"
+                            : "Selecciona zona"}
                   </span>
                 </div>
                 <div
@@ -887,7 +1168,9 @@ export default function CartDrawer() {
                       isPerfumeTheme ? "text-[#4D0819]" : "text-[#0B172A]"
                     }`}
                   >
-                    Total
+                    {approxCustomShipping !== null
+                      ? "Total aproximado"
+                      : "Total"}
                   </span>
                   <span
                     className={
@@ -896,7 +1179,8 @@ export default function CartDrawer() {
                         : "font-montserrat font-black text-2xl text-[#0057FF]"
                     }
                   >
-                    ${totalWithShipping.toFixed(2)}
+                    {approxCustomShipping !== null ? "~" : ""}$
+                    {totalWithShipping.toFixed(2)}
                   </span>
                 </div>
               </div>

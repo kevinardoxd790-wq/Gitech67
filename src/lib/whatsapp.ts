@@ -1,6 +1,12 @@
 import { Product } from "@/types";
 import { Coordinates } from "@/hooks/useCart";
 import { WHATSAPP_NUMBER } from "@/constants/products";
+import {
+  AiShippingQuote,
+  CoverageEstimate,
+  calcularCoberturaEnvioSeguro,
+  formatEnvioUsd,
+} from "@/lib/deliveryCoverage";
 
 interface SafeWhatsAppParams {
   items: { product: Product; quantity: number }[];
@@ -10,11 +16,13 @@ interface SafeWhatsAppParams {
   shippingCost?: number | null;
   subtotal?: number;
   totalWithShipping?: number;
+  coverageEstimate?: CoverageEstimate | null;
+  aiQuote?: AiShippingQuote | null;
 }
 
 /**
  * Genera de forma segura el enlace de WhatsApp estructurando el resumen del pedido,
- * el total fijo y el enlace de ubicación en Waze seleccionado.
+ * el total fijo, la ubicación del cliente y la cobertura/envío aproximado por km.
  */
 export function generarEnlaceWhatsAppSeguro(params: SafeWhatsAppParams): string {
   try {
@@ -33,6 +41,20 @@ export function generarEnlaceWhatsAppSeguro(params: SafeWhatsAppParams): string 
     let msg = `Hola GoTech! 👋\n\n🧾 *Mi Pedido:*\n${lines.join("\n")}`;
     msg += `\n\n💰 Subtotal: $${computedSubtotal.toFixed(2)}`;
 
+    let coverage: CoverageEstimate | null = null;
+    try {
+      coverage =
+        params.coverageEstimate ??
+        calcularCoberturaEnvioSeguro(params.coordinates);
+    } catch {
+      coverage = null;
+    }
+
+    const effectiveShippingUsd =
+      params.aiQuote && Number.isFinite(params.aiQuote.shippingPriceUsd)
+        ? params.aiQuote.shippingPriceUsd
+        : coverage?.estimatedShippingUsd ?? null;
+
     if (
       params.selectedZone &&
       params.shippingCost !== null &&
@@ -46,6 +68,20 @@ export function generarEnlaceWhatsAppSeguro(params: SafeWhatsAppParams): string 
       const finalAmount =
         params.totalWithShipping ?? computedSubtotal + params.shippingCost;
       msg += `\n✅ *Total: $${finalAmount.toFixed(2)}*`;
+    } else if (coverage && effectiveShippingUsd !== null) {
+      msg += `\n🚚 Envío aproximado (${coverage.distanceKm.toFixed(
+        2
+      )} km): ~${formatEnvioUsd(effectiveShippingUsd)}${
+        coverage.withinCoverage
+          ? ""
+          : " (referencial, fuera de cobertura directa > 5 km — coordinar por WhatsApp)"
+      }`;
+      const approxTotal = computedSubtotal + effectiveShippingUsd;
+      msg += `\n✅ *Total aproximado: ~${
+        Number.isInteger(approxTotal)
+          ? `$${approxTotal}`
+          : `$${approxTotal.toFixed(2)}`
+      }*`;
     }
 
     const trimmedAddress = params.address ? params.address.trim() : "";
@@ -54,7 +90,23 @@ export function generarEnlaceWhatsAppSeguro(params: SafeWhatsAppParams): string 
     );
 
     if (trimmedAddress && !isRawCoordsAddress) {
-      msg += `\n\n📍 Dirección: ${trimmedAddress}`;
+      msg += `\n\n📍 Ubicación del cliente: ${trimmedAddress}`;
+    }
+
+    if (coverage && effectiveShippingUsd !== null) {
+      msg += `\n📏 Distancia calculada: ${coverage.distanceKm.toFixed(2)} km`;
+      msg += `\n📡 Cobertura: ${coverage.statusLabel}`;
+      if (
+        params.selectedZone &&
+        params.shippingCost !== null &&
+        params.shippingCost !== undefined
+      ) {
+        msg += `\n💵 Envío aproximado por km${
+          coverage.withinCoverage
+            ? ""
+            : " (referencial, fuera de 5 km — coordinar por WhatsApp)"
+        }: ~${formatEnvioUsd(effectiveShippingUsd)}`;
+      }
     }
 
     const hasValidCoords =
