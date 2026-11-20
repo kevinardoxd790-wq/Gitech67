@@ -33,6 +33,7 @@ import {
   geocodificarDireccionClienteConEstado,
   solicitarCotizacionEnvioIA,
 } from "@/lib/deliveryCoverage";
+import InteractiveLocationMap from "@/components/features/InteractiveLocationMap";
 
 export default function CartDrawer() {
   const location = useLocation();
@@ -83,11 +84,6 @@ export default function CartDrawer() {
   const [geoError, setGeoError] = useState("");
   const [isReferentialGeo, setIsReferentialGeo] = useState(false);
   const [aiQuote, setAiQuote] = useState<AiShippingQuote | null>(null);
-  const [mapQuery, setMapQuery] = useState(
-    coordinates
-      ? `${coordinates.lat.toFixed(6)}, ${coordinates.lng.toFixed(6)}`
-      : address.trim() || "San Salvador, El Salvador"
-  );
 
   const zoneSectionRef = useRef<HTMLDivElement>(null);
   const lastAutoGeocodedRef = useRef<string>("");
@@ -106,15 +102,8 @@ export default function CartDrawer() {
   }, [coordinates, address]);
 
   useEffect(() => {
-    try {
-      if (coordinates) {
-        setMapQuery(
-          `${coordinates.lat.toFixed(6)}, ${coordinates.lng.toFixed(6)}`
-        );
-        setIsReferentialGeo(false);
-      }
-    } catch {
-      // Ignora error de sincronización de mapa
+    if (coordinates) {
+      setIsReferentialGeo(false);
     }
   }, [coordinates]);
 
@@ -144,7 +133,6 @@ export default function CartDrawer() {
           if (cancelled) return;
           lastAutoGeocodedRef.current = trimmed;
           setLocation(trimmed, direct);
-          setMapQuery(`${direct.lat.toFixed(6)}, ${direct.lng.toFixed(6)}`);
           setSelectedZone("");
           setIsReferentialGeo(false);
           return;
@@ -155,11 +143,6 @@ export default function CartDrawer() {
         lastAutoGeocodedRef.current = trimmed;
         if (resolved) {
           setLocation(trimmed, resolved.coords);
-          setMapQuery(
-            resolved.isReferentialFallback
-              ? `${trimmed}, El Salvador`
-              : `${resolved.coords.lat.toFixed(6)}, ${resolved.coords.lng.toFixed(6)}`
-          );
           setSelectedZone("");
           setIsReferentialGeo(resolved.isReferentialFallback);
         }
@@ -277,9 +260,6 @@ export default function CartDrawer() {
         (pos) => {
           try {
             const { latitude, longitude } = pos.coords;
-            const formatted = `${latitude.toFixed(6)}, ${longitude.toFixed(
-              6
-            )}`;
             const currentAddr = address.trim();
             const isCurrentRawCoords =
               /^-?\d{1,3}\.\d+\s*,\s*-?\d{1,3}\.\d+$/.test(currentAddr);
@@ -287,7 +267,6 @@ export default function CartDrawer() {
               currentAddr && !isCurrentRawCoords ? currentAddr : "";
             lastAutoGeocodedRef.current = preservedAddress;
             setLocation(preservedAddress, { lat: latitude, lng: longitude });
-            setMapQuery(formatted);
             setSelectedZone("");
             setZoneError(false);
           } catch {
@@ -326,7 +305,6 @@ export default function CartDrawer() {
       if (parsed) {
         lastAutoGeocodedRef.current = trimmed;
         setLocation(trimmed, parsed);
-        setMapQuery(`${parsed.lat.toFixed(6)}, ${parsed.lng.toFixed(6)}`);
         setSelectedZone("");
         setZoneError(false);
         return;
@@ -337,11 +315,6 @@ export default function CartDrawer() {
       lastAutoGeocodedRef.current = trimmed;
       if (resolved) {
         setLocation(trimmed, resolved.coords);
-        setMapQuery(
-          resolved.isReferentialFallback
-            ? `${trimmed}, El Salvador`
-            : `${resolved.coords.lat.toFixed(6)}, ${resolved.coords.lng.toFixed(6)}`
-        );
         setSelectedZone("");
         setIsReferentialGeo(resolved.isReferentialFallback);
       }
@@ -354,6 +327,16 @@ export default function CartDrawer() {
       setSearchingGeo(false);
     }
   }
+
+  const handleMapSelectCoordinates = (newCoords: { lat: number; lng: number }) => {
+    const coordStr = `${newCoords.lat.toFixed(6)}, ${newCoords.lng.toFixed(6)}`;
+    lastAutoGeocodedRef.current = coordStr;
+    setLocation(coordStr, newCoords);
+    setSelectedZone("");
+    setZoneError(false);
+    setGeoError("");
+    setIsReferentialGeo(false);
+  };
 
   const buildWhatsAppLink = () =>
     generarEnlaceWhatsAppSeguro({
@@ -377,10 +360,6 @@ export default function CartDrawer() {
       block: "center",
     });
   };
-
-  const mapSrc = `https://maps.google.com/maps?q=${encodeURIComponent(
-    mapQuery
-  )}&output=embed&z=15`;
 
   return (
     <>
@@ -976,7 +955,11 @@ export default function CartDrawer() {
                               : "text-[#4D607D]"
                           }`}
                         >
-                          {address.trim() || "Ubicación GPS seleccionada"}
+                          {/^-?\d{1,3}\.\d+\s*,\s*-?\d{1,3}\.\d+$/.test(
+                            address.trim()
+                          )
+                            ? "Ubicación marcada en el mapa"
+                            : address.trim() || "Ubicación GPS seleccionada"}
                           {coverageEstimate
                             ? coverageEstimate.isFreeZone
                               ? " · Envío GRATIS"
@@ -1244,26 +1227,16 @@ export default function CartDrawer() {
                       </div>
                     )}
 
-                    <div
-                      className={`rounded-xl overflow-hidden border h-44 ${
-                        isPerfumeTheme
-                          ? isPerfumeMujer
-                            ? "border-[#F0C4D7] bg-[#FFF1F6]"
-                            : "border-[#C5DFD1] bg-[#EEF7F2]"
-                          : "border-[#DCE7F8] bg-[#F4F8FF]"
-                      }`}
-                    >
-                      <iframe
-                        key={mapQuery}
-                        title="Tu ubicación de entrega"
-                        src={mapSrc}
-                        width="100%"
-                        height="100%"
-                        style={{ border: 0 }}
-                        loading="lazy"
-                        referrerPolicy="no-referrer-when-downgrade"
-                      />
-                    </div>
+                    <InteractiveLocationMap
+                      coordinates={coordinates}
+                      onSelectCoordinates={handleMapSelectCoordinates}
+                      onUseGps={handleUseLocation}
+                      locating={locating}
+                      coverageEstimate={coverageEstimate}
+                      effectiveCustomShippingUsd={effectiveCustomShippingUsd}
+                      isPerfumeTheme={isPerfumeTheme}
+                      isPerfumeMujer={isPerfumeMujer}
+                    />
                   </div>
                 )}
               </div>
