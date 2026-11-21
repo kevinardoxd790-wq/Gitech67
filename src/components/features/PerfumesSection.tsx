@@ -66,35 +66,12 @@ export default function PerfumesSection({
   return (
     <section
       id="perfumes"
-      className={`relative overflow-hidden transition-colors duration-700 ease-in-out ${
+      className={`relative scroll-mt-16 overflow-hidden transition-colors duration-700 ease-in-out ${
         isMujer
           ? "text-[#3B101C] bg-[#FDF2F0]"
           : "text-[#0D2016] bg-[#F7F5EE]"
       }`}
     >
-      {/* Top gradual cross-fading transition when embedded inside Home (/) */}
-      {!standalone && (
-        <div className="relative h-8 sm:h-10 w-full overflow-hidden" aria-hidden="true">
-          <div
-            className={`absolute inset-0 transition-opacity duration-700 ease-in-out ${
-              isMujer ? "opacity-100" : "opacity-0"
-            }`}
-            style={{
-              background:
-                "linear-gradient(180deg, #F4F8FF 0%, #EDE3EC 50%, #5B0A22 100%)",
-            }}
-          />
-          <div
-            className={`absolute inset-0 transition-opacity duration-700 ease-in-out ${
-              isMujer ? "opacity-0" : "opacity-100"
-            }`}
-            style={{
-              background:
-                "linear-gradient(180deg, #F4F8FF 0%, #CFDCD8 50%, #061A0F 100%)",
-            }}
-          />
-        </div>
-      )}
 
       {/* Band 1: Full-Bleed Photographic Luxury Campaign Hero */}
       <div className="relative w-full overflow-hidden bg-[#12070B]">

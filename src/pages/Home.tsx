@@ -256,7 +256,7 @@ export default function Home() {
       </section>
 
       {/* ── FULL CATALOG (// Productos destacados / Todos los Productos) ── */}
-      <section id="catalogo" className="relative py-16 sm:py-20 overflow-hidden">
+      <section id="catalogo" className="relative pt-14 sm:pt-16 pb-5 sm:pb-7 overflow-hidden">
         <GotechBackdrop />
         <div className="relative z-10 max-w-6xl mx-auto px-4">
           <div className="flex flex-wrap items-center justify-between gap-4 mb-8">
