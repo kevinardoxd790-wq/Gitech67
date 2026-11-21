@@ -103,7 +103,7 @@ export default function ProductDetail() {
             {/* Info */}
             <div className="flex flex-col">
               <div
-                className={`font-cinzel flex items-center gap-2 text-xs font-bold uppercase tracking-[0.18em] mb-2 transition-colors duration-700 ${palette.eyebrow}`}
+                className={`font-montserrat flex items-center gap-2 text-[11px] font-medium uppercase tracking-[0.28em] mb-2.5 transition-colors duration-700 ${palette.eyebrow}`}
               >
                 <span>
                   {isHombre ? "Fragancia para Hombre" : "Fragancia para Mujer"}
@@ -113,7 +113,7 @@ export default function ProductDetail() {
               </div>
 
               <h1
-                className={`font-playfair font-bold text-3xl md:text-4xl mb-4 leading-tight transition-colors duration-700 ${palette.price}`}
+                className={`font-luxury font-normal text-3xl md:text-4xl mb-4 leading-tight tracking-[0.015em] transition-colors duration-700 ${palette.price}`}
               >
                 {product.name}
               </h1>
@@ -150,7 +150,7 @@ export default function ProductDetail() {
               {/* Price */}
               <div className="flex items-baseline gap-3 mb-2">
                 <span
-                  className={`font-playfair font-bold text-4xl transition-colors duration-700 ${palette.price}`}
+                  className={`font-luxury font-normal text-4xl tabular-nums transition-colors duration-700 ${palette.price}`}
                 >
                   ${fixedPrice.toFixed(2)}
                 </span>
@@ -236,7 +236,7 @@ export default function ProductDetail() {
           {otherProducts.length > 0 && (
             <div className={`mt-16 pt-10 border-t ${palette.detailBorder}`}>
               <h2
-                className={`font-playfair font-bold text-2xl mb-6 ${palette.price}`}
+                className={`font-luxury font-normal text-2xl sm:text-3xl mb-6 tracking-[0.015em] ${palette.price}`}
               >
                 Otras fragancias que te pueden gustar
               </h2>
@@ -257,17 +257,17 @@ export default function ProductDetail() {
                       />
                       <div className="flex-1 min-w-0">
                         <p
-                          className={`font-cinzel text-[10px] font-bold uppercase tracking-wider mb-0.5 ${pPalette.eyebrow}`}
+                          className={`font-montserrat text-[10px] font-medium uppercase tracking-[0.2em] mb-0.5 ${pPalette.eyebrow}`}
                         >
                           {p.category}
                         </p>
                         <p
-                          className={`font-playfair font-bold text-base mb-1 line-clamp-1 ${pPalette.title}`}
+                          className={`font-luxury font-normal text-base tracking-[0.01em] mb-1 line-clamp-1 ${pPalette.title}`}
                         >
                           {p.name}
                         </p>
                         <p
-                          className={`font-playfair font-bold text-lg ${pPalette.price}`}
+                          className={`font-luxury font-normal text-lg tabular-nums ${pPalette.price}`}
                         >
                           ${Number(p.price).toFixed(2)}
                         </p>

@@ -11,8 +11,8 @@ function formatTwoDigits(n: number): string {
 
 /**
  * Barra superior no invasiva de Oferta Flash con temporizador digital en bucle (HH:MM:SS),
- * con transición suave por opacidad entre GoTech normal (azul), Perfumes Hombre (verde lujo),
- * Perfumes Mujer (rosado lujo), detalle de perfume específico y KNAS admin.
+ * con transición suave por opacidad entre GoTech normal (azul), Perfumes Hombre (verde bosque),
+ * Perfumes Mujer (carmesí lujo), detalle de perfume específico y KNAS admin.
  */
 export default function FlashOfferBar({
   isPerfumeTheme = false,
@@ -51,9 +51,15 @@ export default function FlashOfferBar({
 
   const hasDetailPalette = !isAdminTheme && Boolean(activePerfumePalette);
   const isPerfumeHombre =
-    !isAdminTheme && !hasDetailPalette && isPerfumeTheme && perfumeGender === "hombre";
+    !isAdminTheme &&
+    !hasDetailPalette &&
+    isPerfumeTheme &&
+    perfumeGender === "hombre";
   const isPerfumeMujer =
-    !isAdminTheme && !hasDetailPalette && isPerfumeTheme && perfumeGender === "mujer";
+    !isAdminTheme &&
+    !hasDetailPalette &&
+    isPerfumeTheme &&
+    perfumeGender === "mujer";
 
   return (
     <div
@@ -63,9 +69,9 @@ export default function FlashOfferBar({
           : activePerfumePalette
             ? activePerfumePalette.detailFlashBorder
             : isPerfumeMujer
-              ? "border-[#F7B9D4]/45 text-[#FFF7FA]"
+              ? "border-[#D8B467]/45 text-[#FFF8F6]"
               : isPerfumeHombre
-                ? "border-[#D4AF37]/40 text-[#F7FBF9]"
+                ? "border-[#C5A462]/45 text-[#FAF8F2]"
                 : "border-[#0044CC] text-white"
       }`}
     >
@@ -73,18 +79,20 @@ export default function FlashOfferBar({
       <div
         aria-hidden="true"
         className={`absolute inset-0 bg-gradient-to-r from-[#00349A] via-[#0057FF] to-[#0077FF] transition-opacity duration-700 ease-in-out ${
-          !isAdminTheme && !isPerfumeTheme && !hasDetailPalette ? "opacity-100" : "opacity-0"
+          !isAdminTheme && !isPerfumeTheme && !hasDetailPalette
+            ? "opacity-100"
+            : "opacity-0"
         }`}
       />
       <div
         aria-hidden="true"
-        className={`absolute inset-0 bg-gradient-to-r from-[#042417] via-[#0B4A31] to-[#042417] transition-opacity duration-700 ease-in-out ${
+        className={`absolute inset-0 bg-gradient-to-r from-[#05180E] via-[#0E311E] to-[#05180E] transition-opacity duration-700 ease-in-out ${
           isPerfumeHombre ? "opacity-100" : "opacity-0"
         }`}
       />
       <div
         aria-hidden="true"
-        className={`absolute inset-0 bg-gradient-to-r from-[#781542] via-[#A62660] to-[#781542] transition-opacity duration-700 ease-in-out ${
+        className={`absolute inset-0 bg-gradient-to-r from-[#650925] via-[#96173E] to-[#650925] transition-opacity duration-700 ease-in-out ${
           isPerfumeMujer ? "opacity-100" : "opacity-0"
         }`}
       />
@@ -109,9 +117,9 @@ export default function FlashOfferBar({
               : activePerfumePalette
                 ? activePerfumePalette.detailFlashIcon
                 : isPerfumeMujer
-                  ? "text-[#FFD8E8]"
+                  ? "text-[#F4D692]"
                   : isPerfumeHombre
-                    ? "text-[#E8CF8E]"
+                    ? "text-[#E6CA85]"
                     : "text-[#D4ECFF]"
           }`}
         />
@@ -122,9 +130,9 @@ export default function FlashOfferBar({
               : activePerfumePalette
                 ? activePerfumePalette.detailFlashText
                 : isPerfumeMujer
-                  ? "font-playfair tracking-wide text-[#FFF5F9]"
+                  ? "font-playfair tracking-wide text-[#FFF7F5]"
                   : isPerfumeHombre
-                    ? "font-playfair tracking-wide text-[#F5FAF7]"
+                    ? "font-playfair tracking-wide text-[#F7F5EE]"
                     : "text-white"
           }`}
         >
@@ -141,9 +149,9 @@ export default function FlashOfferBar({
               : activePerfumePalette
                 ? activePerfumePalette.detailFlashClock
                 : isPerfumeMujer
-                  ? "font-playfair font-bold text-[#FFF0F6] bg-[#5C0E32]/80 border border-[#F7B9D4]/50"
+                  ? "font-playfair font-bold text-[#FFF5E8] bg-[#4C061B]/85 border border-[#D8B467]/55"
                   : isPerfumeHombre
-                    ? "font-playfair font-bold text-[#F5E7BC] bg-[#042417]/85 border border-[#D4AF37]/50"
+                    ? "font-playfair font-bold text-[#F7E9C8] bg-[#04140B]/85 border border-[#C5A462]/55"
                     : "font-montserrat font-extrabold text-[#00349A] bg-white/95 border border-white/60"
           }`}
         >

@@ -11,15 +11,12 @@ import {
   Check,
 } from "lucide-react";
 import { Coordinates } from "@/hooks/useCart";
-import { CoverageEstimate, formatEnvioUsd } from "@/lib/deliveryCoverage";
 
 interface InteractiveLocationMapProps {
   coordinates: Coordinates | null;
   onSelectCoordinates: (coords: Coordinates) => void;
   onUseGps?: () => void;
   locating?: boolean;
-  coverageEstimate?: CoverageEstimate | null;
-  effectiveCustomShippingUsd?: number | null;
   isPerfumeTheme?: boolean;
   isPerfumeMujer?: boolean;
 }
@@ -73,11 +70,26 @@ function LeafletCanvas({
       doubleClickZoom: true,
       boxZoom: false,
       scrollWheelZoom: expanded,
-    });
+      tap: true,
+      tapTolerance: 18,
+    } as L.MapOptions);
 
     L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
       maxZoom: 19,
     }).addTo(map);
+
+    const emitIfChanged = (coords: Coordinates) => {
+      const prev = lastEmittedRef.current;
+      if (
+        prev &&
+        Math.abs(prev.lat - coords.lat) < 0.000005 &&
+        Math.abs(prev.lng - coords.lng) < 0.000005
+      ) {
+        return;
+      }
+      lastEmittedRef.current = coords;
+      onSelectRef.current(coords);
+    };
 
     map.on("movestart", () => {
       if (!isProgrammaticMoveRef.current) {
@@ -92,15 +104,18 @@ function LeafletCanvas({
         return;
       }
       const center = map.getCenter();
-      const next: Coordinates = {
+      emitIfChanged({
         lat: Number(center.lat.toFixed(6)),
         lng: Number(center.lng.toFixed(6)),
-      };
-      lastEmittedRef.current = next;
-      onSelectRef.current(next);
+      });
     });
 
     map.on("click", (e: L.LeafletMouseEvent) => {
+      const next: Coordinates = {
+        lat: Number(e.latlng.lat.toFixed(6)),
+        lng: Number(e.latlng.lng.toFixed(6)),
+      };
+      emitIfChanged(next);
       map.panTo(e.latlng, { animate: true });
     });
 
@@ -170,12 +185,21 @@ function LeafletCanvas({
     : "bg-[#0057FF]";
 
   return (
-    <div className="relative w-full h-full select-none overflow-hidden">
+    <div
+      className="relative w-full h-full select-none overflow-hidden"
+      onTouchStart={(e) => e.stopPropagation()}
+      onPointerDown={(e) => e.stopPropagation()}
+    >
       <div
         ref={containerRef}
         className="w-full h-full z-0"
         style={{ touchAction: "none" }}
       />
+
+      {/* Helper Badge */}
+      <div className="pointer-events-none absolute top-2.5 left-2.5 z-[450] rounded-lg bg-white/95 text-[#0B172A] border border-black/10 px-2.5 py-1 text-[10.5px] font-semibold shadow-sm backdrop-blur-sm">
+        Toca o mueve con 1 dedo
+      </div>
 
       {/* Center Target Pin */}
       <div className="pointer-events-none absolute inset-0 z-[400] flex items-center justify-center">
@@ -255,8 +279,6 @@ export default function InteractiveLocationMap({
   onSelectCoordinates,
   onUseGps,
   locating = false,
-  coverageEstimate,
-  effectiveCustomShippingUsd,
   isPerfumeTheme = false,
   isPerfumeMujer = false,
 }: InteractiveLocationMapProps) {
@@ -322,28 +344,24 @@ export default function InteractiveLocationMap({
               </button>
             </div>
 
-            {/* Live Coverage Strip */}
-            {coverageEstimate && (
-              <div
-                className={`px-4 py-2 text-xs border-b flex flex-wrap items-center justify-between gap-2 shrink-0 ${
-                  coverageEstimate.withinCoverage
-                    ? "bg-emerald-50 border-emerald-200 text-emerald-900"
-                    : "bg-amber-50 border-amber-200 text-amber-900"
-                }`}
-              >
-                <span className="font-semibold">
-                  {coverageEstimate.distanceKm.toFixed(2)} km ·{" "}
-                  {coverageEstimate.isFreeZone
-                    ? `Envío GRATIS (${coverageEstimate.freeZoneName})`
-                    : coverageEstimate.withinCoverage
-                      ? `Estimación: ~${formatEnvioUsd(
-                          effectiveCustomShippingUsd ??
-                            coverageEstimate.estimatedShippingUsd
-                        )} USD (acordar en WhatsApp)`
-                      : "No se puede hacer el envío (consulta en WhatsApp)"}
-                </span>
-              </div>
-            )}
+            {/* Live Location Strip */}
+            <div
+              className={`px-4 py-2 text-xs border-b flex flex-wrap items-center justify-between gap-2 shrink-0 ${
+                coordinates
+                  ? "bg-emerald-50 border-emerald-200 text-emerald-900"
+                  : isPerfumeTheme
+                    ? isPerfumeMujer
+                      ? "bg-[#FFF8FB] border-[#F0C4D7] text-[#7E3B59]"
+                      : "bg-[#F7FBF9] border-[#C5DFD1] text-[#355E4D]"
+                    : "bg-[#F8FAFF] border-[#DCE7F8] text-[#4D607D]"
+              }`}
+            >
+              <span className="font-semibold">
+                {coordinates
+                  ? "Ubicación marcada en el mapa"
+                  : "Toca o mueve el mapa con 1 dedo para elegir tu punto de entrega"}
+              </span>
+            </div>
 
             {/* Expanded Map Canvas */}
             <div className="flex-1 min-h-0 relative">

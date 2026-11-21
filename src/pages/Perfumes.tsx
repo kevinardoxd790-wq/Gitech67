@@ -7,8 +7,8 @@ export default function Perfumes() {
 
   return (
     <div
-      className={`pt-16 min-h-screen transition-colors duration-500 ${
-        isHombre ? "bg-[#EEF7F2]" : "bg-[#FFF1F6]"
+      className={`pt-16 min-h-screen transition-colors duration-700 ease-in-out ${
+        isHombre ? "bg-[#F7F5EE]" : "bg-[#FDF2F0]"
       }`}
     >
       <PerfumesSection standalone />

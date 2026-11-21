@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef, useMemo } from "react";
+import { useState, useEffect, useRef } from "react";
 import { useLocation } from "react-router-dom";
 import {
   X,
@@ -13,10 +13,8 @@ import {
   Search,
   ChevronDown,
   ChevronUp,
-  CheckCircle2,
-  AlertTriangle,
 } from "lucide-react";
-import { useCart } from "@/hooks/useCart";
+import { Coordinates, useCart } from "@/hooks/useCart";
 import { useCatalog } from "@/hooks/useCatalog";
 import { usePerfumeTheme } from "@/hooks/usePerfumeZone";
 import {
@@ -26,14 +24,10 @@ import {
 } from "@/constants/products";
 import { generarEnlaceWhatsAppSeguro } from "@/lib/whatsapp";
 import {
-  AiShippingQuote,
-  calcularCoberturaEnvioSeguro,
   extractCoordinatesFromInput,
-  formatEnvioUsd,
   geocodificarDireccionClienteConEstado,
-  solicitarCotizacionEnvioIA,
 } from "@/lib/deliveryCoverage";
-import InteractiveLocationMap from "@/components/features/InteractiveLocationMap";
+import InteractiveLocationMap from "./InteractiveLocationMap";
 
 export default function CartDrawer() {
   const location = useLocation();
@@ -82,8 +76,6 @@ export default function CartDrawer() {
   const [locating, setLocating] = useState(false);
   const [searchingGeo, setSearchingGeo] = useState(false);
   const [geoError, setGeoError] = useState("");
-  const [isReferentialGeo, setIsReferentialGeo] = useState(false);
-  const [aiQuote, setAiQuote] = useState<AiShippingQuote | null>(null);
 
   const zoneSectionRef = useRef<HTMLDivElement>(null);
   const lastAutoGeocodedRef = useRef<string>("");
@@ -93,32 +85,17 @@ export default function CartDrawer() {
   const paidZones = shippingZones.filter((z) => z.cost > 0);
   const shippingLabel = getShippingLabel(totalPrice, totalItems);
 
-  const coverageEstimate = useMemo(() => {
-    try {
-      return calcularCoberturaEnvioSeguro(coordinates, address);
-    } catch {
-      return null;
-    }
-  }, [coordinates, address]);
-
-  useEffect(() => {
-    if (coordinates) {
-      setIsReferentialGeo(false);
-    }
-  }, [coordinates]);
-
   useEffect(() => {
     if (isOpen && (address.trim() || coordinates) && !selectedZone) {
       setShowCustomLocation(true);
     }
   }, [isOpen, address, coordinates, selectedZone]);
 
-  // Auto-geocodifica cualquier dirección escrita para calcular siempre cobertura de 5 km y costo de envío
+  // Centra el mapa automáticamente al escribir una dirección
   useEffect(() => {
     if (!isOpen) return;
     const trimmed = address.trim();
     if (trimmed.length < 3) {
-      setIsReferentialGeo(false);
       return;
     }
     if (trimmed === lastAutoGeocodedRef.current && coordinates) {
@@ -134,7 +111,6 @@ export default function CartDrawer() {
           lastAutoGeocodedRef.current = trimmed;
           setLocation(trimmed, direct);
           setSelectedZone("");
-          setIsReferentialGeo(false);
           return;
         }
 
@@ -144,7 +120,6 @@ export default function CartDrawer() {
         if (resolved) {
           setLocation(trimmed, resolved.coords);
           setSelectedZone("");
-          setIsReferentialGeo(resolved.isReferentialFallback);
         }
       } catch {
         // No interrumpe la escritura si falla la geocodificación automática
@@ -157,61 +132,6 @@ export default function CartDrawer() {
     };
   }, [isOpen, address, coordinates, setLocation]);
 
-  const coverageDistanceKey = coverageEstimate?.distanceKm ?? null;
-  const coverageWithinKey = coverageEstimate?.withinCoverage ?? null;
-  const coverageIsFreeKey = Boolean(coverageEstimate?.isFreeZone);
-
-  useEffect(() => {
-    if (
-      !isOpen ||
-      coverageDistanceKey === null ||
-      !coverageWithinKey ||
-      coverageIsFreeKey ||
-      !coverageEstimate ||
-      items.length === 0
-    ) {
-      if (!coverageEstimate || !coverageWithinKey || coverageIsFreeKey) {
-        setAiQuote(null);
-      }
-      return;
-    }
-    let cancelled = false;
-    const timer = window.setTimeout(async () => {
-      try {
-        const result = await solicitarCotizacionEnvioIA({
-          coverage: coverageEstimate,
-          subtotal: totalPrice,
-          itemCount: totalItems,
-          customerAddress: address,
-        });
-        if (cancelled) return;
-        if (result.quote) {
-          setAiQuote(result.quote);
-        } else {
-          setAiQuote(null);
-        }
-      } catch {
-        if (!cancelled) {
-          setAiQuote(null);
-        }
-      }
-    }, 150);
-
-    return () => {
-      cancelled = true;
-      window.clearTimeout(timer);
-    };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [
-    isOpen,
-    coverageDistanceKey,
-    coverageWithinKey,
-    coverageIsFreeKey,
-    items.length,
-    totalPrice,
-    totalItems,
-  ]);
-
   useEffect(() => {
     if (selectedZone && !shippingZones.some((z) => z.name === selectedZone)) {
       setSelectedZone("");
@@ -222,36 +142,31 @@ export default function CartDrawer() {
 
   const selectedZoneObj = shippingZones.find((z) => z.name === selectedZone);
   const shippingCost = selectedZoneObj?.cost ?? null;
-  const effectiveCustomShippingUsd = coverageEstimate
-    ? coverageEstimate.isFreeZone
-      ? 0
-      : coverageEstimate.withinCoverage
-        ? aiQuote
-          ? aiQuote.shippingPriceUsd
-          : coverageEstimate.estimatedShippingUsd
-        : null
-    : null;
-  const approxCustomShipping =
-    shippingCost === null ? effectiveCustomShippingUsd : null;
-  const isEstimatedCustomShipping =
-    approxCustomShipping !== null && !coverageEstimate?.isFreeZone;
   const totalWithShipping =
-    shippingCost !== null
-      ? totalPrice + shippingCost
-      : approxCustomShipping !== null
-        ? totalPrice + approxCustomShipping
-        : totalPrice;
+    shippingCost !== null ? totalPrice + shippingCost : totalPrice;
 
   const hasCustomLocation = Boolean(address.trim() || coordinates);
   const canBuyDirect = Boolean(selectedZone || hasCustomLocation);
 
+  function handleSelectMapCoordinates(coords: Coordinates) {
+    const currentAddr = address.trim();
+    const isCurrentRawCoords =
+      /^-?\d{1,3}\.\d+\s*,\s*-?\d{1,3}\.\d+$/.test(currentAddr);
+    const preservedAddress =
+      currentAddr && !isCurrentRawCoords ? currentAddr : "";
+    lastAutoGeocodedRef.current = preservedAddress;
+    setLocation(preservedAddress, coords);
+    setSelectedZone("");
+    setZoneError(false);
+    setGeoError("");
+  }
+
   function handleUseLocation() {
     try {
       setGeoError("");
-      setIsReferentialGeo(false);
       if (!navigator.geolocation) {
         setGeoError(
-          "Tu navegador no soporta geolocalización. Escribe tu dirección y presiona Buscar mi dirección."
+          "Tu navegador no soporta geolocalización. Toca el mapa con 1 dedo o escribe tu dirección."
         );
         return;
       }
@@ -271,7 +186,7 @@ export default function CartDrawer() {
             setZoneError(false);
           } catch {
             setGeoError(
-              "No se pudo procesar tu ubicación. Intenta buscar tu dirección."
+              "No se pudo procesar tu ubicación. Intenta tocar el mapa o buscar tu dirección."
             );
           } finally {
             setLocating(false);
@@ -280,14 +195,14 @@ export default function CartDrawer() {
         () => {
           setLocating(false);
           setGeoError(
-            "No se pudo obtener tu ubicación GPS. Escribe tu colonia o dirección arriba y presiona Buscar mi dirección."
+            "No se pudo obtener tu ubicación GPS. Selecciona tu punto en el mapa o escribe tu dirección."
           );
         }
       );
     } catch {
       setLocating(false);
       setGeoError(
-        "No se pudo iniciar la geolocalización. Escribe tu dirección y presiona Buscar mi dirección."
+        "No se pudo iniciar la geolocalización. Selecciona tu punto en el mapa o escribe tu dirección."
       );
     }
   }
@@ -295,7 +210,6 @@ export default function CartDrawer() {
   async function handleSearchAddress() {
     try {
       setGeoError("");
-      setIsReferentialGeo(false);
       const trimmed = address.trim();
       if (!trimmed) {
         setGeoError("Escribe una dirección para buscarla en el mapa.");
@@ -316,41 +230,26 @@ export default function CartDrawer() {
       if (resolved) {
         setLocation(trimmed, resolved.coords);
         setSelectedZone("");
-        setIsReferentialGeo(resolved.isReferentialFallback);
       }
       setZoneError(false);
     } catch {
       setGeoError(
-        "No se pudo completar la búsqueda. Intenta nuevamente o usa tu GPS."
+        "No se pudo completar la búsqueda. Intenta nuevamente, toca el mapa o usa tu GPS."
       );
     } finally {
       setSearchingGeo(false);
     }
   }
 
-  const handleMapSelectCoordinates = (newCoords: { lat: number; lng: number }) => {
-    const coordStr = `${newCoords.lat.toFixed(6)}, ${newCoords.lng.toFixed(6)}`;
-    lastAutoGeocodedRef.current = coordStr;
-    setLocation(coordStr, newCoords);
-    setSelectedZone("");
-    setZoneError(false);
-    setGeoError("");
-    setIsReferentialGeo(false);
-  };
-
   const buildWhatsAppLink = () =>
     generarEnlaceWhatsAppSeguro({
       items,
       address,
       coordinates,
-      selectedZone:
-        selectedZone ||
-        (hasCustomLocation ? "Ubicación personalizada" : undefined),
+      selectedZone: selectedZone || undefined,
       shippingCost: selectedZone ? shippingCost : null,
       subtotal: totalPrice,
       totalWithShipping,
-      coverageEstimate,
-      aiQuote,
     });
 
   const handleMissingSelection = () => {
@@ -926,22 +825,9 @@ export default function CartDrawer() {
                         >
                           Seleccionar ubicación personalizada
                         </p>
-                        {coverageEstimate && (
-                          <span
-                            className={`shrink-0 text-[10px] font-bold px-2 py-0.5 rounded-full border ${
-                              coverageEstimate.withinCoverage
-                                ? "bg-emerald-50 border-emerald-200 text-emerald-700"
-                                : "bg-amber-50 border-amber-200 text-amber-700"
-                            }`}
-                          >
-                            {coverageEstimate.isFreeZone
-                              ? "GRATIS"
-                              : coverageEstimate.withinCoverage &&
-                                  effectiveCustomShippingUsd !== null
-                                ? `${coverageEstimate.distanceKm.toFixed(1)} km · ~${formatEnvioUsd(
-                                    effectiveCustomShippingUsd
-                                  )}`
-                                : `${coverageEstimate.distanceKm.toFixed(1)} km · Sin cobertura`}
+                        {!selectedZone && hasCustomLocation && (
+                          <span className="shrink-0 text-[10px] font-bold px-2 py-0.5 rounded-full border bg-emerald-50 border-emerald-200 text-emerald-700">
+                            Lista
                           </span>
                         )}
                       </div>
@@ -955,21 +841,7 @@ export default function CartDrawer() {
                               : "text-[#4D607D]"
                           }`}
                         >
-                          {/^-?\d{1,3}\.\d+\s*,\s*-?\d{1,3}\.\d+$/.test(
-                            address.trim()
-                          )
-                            ? "Ubicación marcada en el mapa"
-                            : address.trim() || "Ubicación GPS seleccionada"}
-                          {coverageEstimate
-                            ? coverageEstimate.isFreeZone
-                              ? " · Envío GRATIS"
-                              : coverageEstimate.withinCoverage &&
-                                  effectiveCustomShippingUsd !== null
-                                ? ` · Estimación: ~${formatEnvioUsd(
-                                    effectiveCustomShippingUsd
-                                  )} (acordar en WhatsApp)`
-                                : " · No se puede hacer el envío (consulta en WhatsApp)"
-                            : ""}
+                          {address.trim() || "Ubicación seleccionada en el mapa"}
                         </p>
                       )}
                     </div>
@@ -1061,7 +933,7 @@ export default function CartDrawer() {
                             searchingGeo ? "animate-pulse" : ""
                           }`}
                         />
-                        {searchingGeo ? "Calculando..." : "Buscar mi dirección"}
+                        {searchingGeo ? "Buscando..." : "Buscar mi dirección"}
                       </button>
 
                       <button
@@ -1089,82 +961,6 @@ export default function CartDrawer() {
                       <p className="text-[11px] text-center text-amber-700 font-medium">
                         {geoError}
                       </p>
-                    )}
-
-                    {isReferentialGeo && coverageEstimate && address.trim().length >= 3 && (
-                      <p className="text-[10.5px] opacity-80 leading-snug px-1">
-                        Cálculo referencial en San Salvador; agrega tu colonia o
-                        presiona <strong>Usar mi GPS</strong> si deseas mayor exactitud.
-                      </p>
-                    )}
-
-                    {/* Resultado limpio de cobertura de 5 km y costo aproximado de envío (sin punto de origen ni desglose interno) */}
-                    {coverageEstimate && (
-                      <div
-                        className={`rounded-xl border p-3 space-y-1.5 ${
-                          coverageEstimate.withinCoverage
-                            ? isPerfumeTheme
-                              ? "bg-emerald-50/80 border-emerald-700/25 text-emerald-950"
-                              : "bg-emerald-50/90 border-emerald-200 text-emerald-950"
-                            : isPerfumeTheme
-                              ? "bg-amber-50/90 border-amber-700/25 text-amber-950"
-                              : "bg-amber-50 border-amber-200 text-amber-950"
-                        }`}
-                      >
-                        <div className="flex items-start gap-2">
-                          {coverageEstimate.withinCoverage ? (
-                            <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0 mt-0.5" />
-                          ) : (
-                            <AlertTriangle className="w-4 h-4 text-amber-600 shrink-0 mt-0.5" />
-                          )}
-                          <div className="min-w-0 flex-1 space-y-0.5">
-                            <p className="text-xs font-bold leading-snug">
-                              {coverageEstimate.statusLabel}
-                            </p>
-                            <div className="flex flex-wrap items-center justify-between gap-x-3 gap-y-1 text-[11px] pt-0.5">
-                              <span className="font-medium opacity-90">
-                                Distancia:{" "}
-                                <strong>
-                                  {coverageEstimate.distanceKm.toFixed(2)} km
-                                </strong>
-                              </span>
-                              {coverageEstimate.isFreeZone ? (
-                                <span className="font-bold text-emerald-700">
-                                  Envío: GRATIS
-                                </span>
-                              ) : coverageEstimate.withinCoverage ? (
-                                <span className="font-bold">
-                                  Estimación de envío: ~
-                                  {formatEnvioUsd(
-                                    effectiveCustomShippingUsd ??
-                                      coverageEstimate.estimatedShippingUsd
-                                  )}{" "}
-                                  USD
-                                </span>
-                              ) : (
-                                <span className="font-bold text-amber-900">
-                                  Supera {coverageEstimate.maxCoverageKm.toFixed(0)} km
-                                </span>
-                              )}
-                            </div>
-                            <p
-                              className={`text-[10.5px] leading-snug pt-1 font-medium ${
-                                coverageEstimate.withinCoverage
-                                  ? "text-emerald-900"
-                                  : "text-amber-900"
-                              }`}
-                            >
-                              {coverageEstimate.isFreeZone
-                                ? "Aplica envío gratis únicamente en este punto exacto (cercanías no aplican)."
-                                : coverageEstimate.withinCoverage
-                                  ? "Es una estimación; el precio final se debe acordar en WhatsApp."
-                                  : `Supera el límite de ${coverageEstimate.maxCoverageKm.toFixed(
-                                      0
-                                    )} km. No se puede hacer el envío (consulta en WhatsApp).`}
-                            </p>
-                          </div>
-                        </div>
-                      </div>
                     )}
 
                     {(coordinates || address.trim()) && (
@@ -1229,11 +1025,9 @@ export default function CartDrawer() {
 
                     <InteractiveLocationMap
                       coordinates={coordinates}
-                      onSelectCoordinates={handleMapSelectCoordinates}
+                      onSelectCoordinates={handleSelectMapCoordinates}
                       onUseGps={handleUseLocation}
                       locating={locating}
-                      coverageEstimate={coverageEstimate}
-                      effectiveCustomShippingUsd={effectiveCustomShippingUsd}
                       isPerfumeTheme={isPerfumeTheme}
                       isPerfumeMujer={isPerfumeMujer}
                     />
@@ -1275,16 +1069,7 @@ export default function CartDrawer() {
                         : "text-[#546885]"
                     }
                   >
-                    Envío{" "}
-                    {selectedZone
-                      ? `(${selectedZone})`
-                      : coverageEstimate
-                        ? coverageEstimate.isFreeZone
-                          ? `(${coverageEstimate.freeZoneName})`
-                          : coverageEstimate.withinCoverage
-                            ? `estimado (${coverageEstimate.distanceKm.toFixed(2)} km)`
-                            : `(${coverageEstimate.distanceKm.toFixed(2)} km)`
-                        : ""}
+                    Envío {selectedZone ? `(${selectedZone})` : ""}
                   </span>
                   <span
                     className={
@@ -1292,10 +1077,12 @@ export default function CartDrawer() {
                         ? "text-emerald-700 font-bold"
                         : shippingCost !== null
                           ? "text-amber-700 font-bold"
-                          : coverageEstimate
-                            ? coverageEstimate.withinCoverage
-                              ? "text-emerald-700 font-bold"
-                              : "text-amber-700 font-bold text-right"
+                          : hasCustomLocation
+                            ? isPerfumeTheme
+                              ? isPerfumeMujer
+                                ? "text-[#A62660] font-semibold"
+                                : "text-[#0B4A31] font-semibold"
+                              : "text-[#0057FF] font-semibold"
                             : isPerfumeTheme
                               ? isPerfumeMujer
                                 ? "text-[#B07A92]"
@@ -1311,16 +1098,9 @@ export default function CartDrawer() {
                               ? `$${shippingCost}`
                               : `$${shippingCost.toFixed(2)}`
                           }`
-                        : coverageEstimate
-                          ? coverageEstimate.isFreeZone
-                            ? "GRATIS"
-                            : coverageEstimate.withinCoverage &&
-                                effectiveCustomShippingUsd !== null
-                              ? `~${formatEnvioUsd(effectiveCustomShippingUsd)} (estimado)`
-                              : "No se puede hacer el envío (consulta en WhatsApp)"
-                          : hasCustomLocation
-                            ? "Por confirmar"
-                            : "Selecciona zona"}
+                        : hasCustomLocation
+                          ? "A coordinar en WhatsApp"
+                          : "Selecciona zona"}
                   </span>
                 </div>
                 <div
@@ -1341,7 +1121,7 @@ export default function CartDrawer() {
                         : "text-[#0B172A]"
                     }`}
                   >
-                    {isEstimatedCustomShipping ? "Total estimado" : "Total"}
+                    Total
                   </span>
                   <span
                     className={
@@ -1352,36 +1132,9 @@ export default function CartDrawer() {
                         : "font-montserrat font-black text-2xl text-[#0057FF]"
                     }
                   >
-                    {isEstimatedCustomShipping ? "~" : ""}$
-                    {totalWithShipping.toFixed(2)}
+                    ${totalWithShipping.toFixed(2)}
                   </span>
                 </div>
-                {isEstimatedCustomShipping && (
-                  <p
-                    className={`text-[10.5px] leading-snug pt-0.5 ${
-                      isPerfumeTheme
-                        ? isPerfumeMujer
-                          ? "text-[#7E3B59]"
-                          : "text-[#355E4D]"
-                        : "text-[#546885]"
-                    }`}
-                  >
-                    El envío es una estimación; el precio final se debe acordar en WhatsApp.
-                  </p>
-                )}
-                {!selectedZone && coverageEstimate && !coverageEstimate.withinCoverage && (
-                  <p
-                    className={`text-[10.5px] leading-snug pt-0.5 ${
-                      isPerfumeTheme
-                        ? isPerfumeMujer
-                          ? "text-[#7E3B59]"
-                          : "text-[#355E4D]"
-                        : "text-amber-700"
-                    }`}
-                  >
-                    Supera los {coverageEstimate.maxCoverageKm.toFixed(0)} km: no se puede hacer el envío (consulta en WhatsApp).
-                  </p>
-                )}
               </div>
 
               {canBuyDirect ? (

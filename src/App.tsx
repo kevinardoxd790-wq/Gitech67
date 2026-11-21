@@ -46,8 +46,8 @@ function AppShell() {
       ? `min-h-screen ${activePerfumePalette.detailShellBg} font-montserrat transition-colors duration-700`
       : isPerfumes
         ? perfumeGender === "mujer"
-          ? "min-h-screen bg-[#FFF1F6] text-[#5C0E32] font-montserrat transition-colors duration-700"
-          : "min-h-screen bg-[#EEF7F2] text-[#063020] font-montserrat transition-colors duration-700"
+          ? "min-h-screen bg-[#FDF2F0] text-[#3B101C] font-montserrat transition-colors duration-700 ease-in-out"
+          : "min-h-screen bg-[#F7F5EE] text-[#0D2016] font-montserrat transition-colors duration-700 ease-in-out"
         : "min-h-screen bg-[#F4F8FF] text-[#0B172A] font-montserrat";
 
   return (

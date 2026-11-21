@@ -48,6 +48,12 @@ export default function Navbar() {
   const isPerfumeMujer = isPerfumeTheme && perfumeGender === "mujer";
   const isAdminTheme = location.pathname.startsWith("/admin");
   const detailPalette = !isAdminTheme ? activePerfumePalette : null;
+  const logoAccentTone =
+    !isAdminTheme && (isPerfumeTheme || detailPalette)
+      ? perfumeGender === "mujer"
+        ? "mujer"
+        : "hombre"
+      : "gotech";
 
   const { products } = useCatalog();
   const { totalItems, openCart, cartBounce, addToCart } = useCart();
@@ -143,8 +149,8 @@ export default function Navbar() {
               ? detailPalette.detailNavDropdown
               : isPerfumeTheme
                 ? isPerfumeMujer
-                  ? "bg-[#FFF8FB] border-[#F0C4D7] text-[#5C0E32] shadow-[0_18px_42px_rgba(142,29,78,0.20)]"
-                  : "bg-[#F7FBF9] border-[#C5DFD1] text-[#063020] shadow-[0_18px_42px_rgba(6,48,32,0.20)]"
+                  ? "bg-[#FFF9F7] border-[#EBD0C9] text-[#3B101C] shadow-[0_18px_42px_rgba(142,16,54,0.18)]"
+                  : "bg-[#FBF9F4] border-[#D7D0BE] text-[#0D2016] shadow-[0_18px_42px_rgba(11,40,25,0.18)]"
                 : "bg-white border-[#CFE0FA] text-[#0B172A] shadow-[0_18px_42px_rgba(0,68,180,0.16)]"
         }`}
       >
@@ -156,8 +162,8 @@ export default function Navbar() {
                 ? detailPalette.detailNavDropdownHead
                 : isPerfumeTheme
                   ? isPerfumeMujer
-                    ? "border-[#F0C4D7] bg-[#FFF1F6] text-[#A62660]"
-                    : "border-[#C5DFD1] bg-[#EEF7F2] text-[#0C593B]"
+                    ? "border-[#EBD0C9] bg-[#FDF2F0] text-[#8E1036]"
+                    : "border-[#D7D0BE] bg-[#F7F5EE] text-[#0B2819]"
                   : "border-[#E7EFFC] bg-[#F4F8FF] text-[#0057FF]"
           }`}
         >
@@ -199,8 +205,8 @@ export default function Navbar() {
                           ? detailPalette.detailNavDropdownHover
                           : isPerfumeTheme
                             ? isPerfumeMujer
-                              ? "hover:bg-[#FFF1F6]"
-                              : "hover:bg-[#EEF7F2]"
+                              ? "hover:bg-[#FDF2F0]"
+                              : "hover:bg-[#F7F5EE]"
                             : "hover:bg-[#F4F8FF]"
                     }`}
                   >
@@ -221,8 +227,8 @@ export default function Navbar() {
                             ? "bg-dark-700 border-neon-cyan/20"
                             : isPerfumeTheme
                               ? isPerfumeMujer
-                                ? "bg-[#FFF3F7] border-[#F0C4D7]"
-                                : "bg-[#EEF7F2] border-[#C5DFD1]"
+                                ? "bg-[#FDF2F0] border-[#EBD0C9]"
+                                : "bg-[#F7F5EE] border-[#D7D0BE]"
                               : "bg-[#F8FAFF] border-[#DCE7F8]"
                         }`}
                       />
@@ -232,8 +238,8 @@ export default function Navbar() {
                             className={`text-[9px] font-bold uppercase tracking-wider px-1.5 py-0.5 rounded-full ${
                               perfume
                                 ? product.category.toLowerCase().includes("mujer")
-                                  ? "bg-[#FCE4EE] text-[#A62660]"
-                                  : "bg-[#E2F0E9] text-[#0B4A31]"
+                                  ? "bg-[#FAE6E3] text-[#8E1036]"
+                                  : "bg-[#EAE7DA] text-[#0B2819]"
                                 : isAdminTheme
                                   ? "bg-neon-cyan/15 text-neon-cyan"
                                   : "bg-[#EAF2FF] text-[#0057FF]"
@@ -262,8 +268,8 @@ export default function Navbar() {
                               ? "text-neon-cyan"
                               : isPerfumeTheme
                                 ? isPerfumeMujer
-                                  ? "text-[#A62660]"
-                                  : "text-[#0B4A31]"
+                                  ? "text-[#8E1036]"
+                                  : "text-[#0B2819]"
                                 : "text-[#0057FF]"
                           }`}
                         >
@@ -288,8 +294,8 @@ export default function Navbar() {
                               ? detailPalette.detailNavCartBtn
                               : isPerfumeTheme
                                 ? isPerfumeMujer
-                                  ? "bg-[#A62660] text-white hover:bg-[#C23273]"
-                                  : "bg-[#0B4A31] text-white hover:bg-[#116443]"
+                                  ? "bg-[#8E1036] text-white hover:bg-[#AA1B46]"
+                                  : "bg-[#0B2819] text-white hover:bg-[#144029]"
                                 : "bg-[#0057FF] text-white hover:bg-[#0044CC]"
                         }`}
                       >
@@ -318,8 +324,8 @@ export default function Navbar() {
                     ? detailPalette.detailNavDropdownFoot
                     : isPerfumeTheme
                       ? isPerfumeMujer
-                        ? "border-[#F0C4D7] text-[#A62660] hover:bg-[#FFF1F6]"
-                        : "border-[#C5DFD1] text-[#0B4A31] hover:bg-[#EEF7F2]"
+                        ? "border-[#EBD0C9] text-[#8E1036] hover:bg-[#FDF2F0]"
+                        : "border-[#D7D0BE] text-[#0B2819] hover:bg-[#F7F5EE]"
                       : "border-[#E7EFFC] text-[#0057FF] hover:bg-[#F4F8FF]"
               }`}
             >
@@ -351,13 +357,13 @@ export default function Navbar() {
                 ? detailPalette.detailNavBg
                 : isPerfumeTheme
                   ? isPerfumeMujer
-                    ? "bg-[#FFF1F6]/95 border-[#F0C4D7] shadow-[0_4px_20px_rgba(142,29,78,0.08)]"
-                    : "bg-[#EEF7F2]/95 border-[#C5DFD1] shadow-[0_4px_20px_rgba(6,48,32,0.08)]"
+                    ? "bg-[#FDF1EC]/95 border-[#EBD0C9] shadow-[0_4px_20px_rgba(142,16,54,0.07)]"
+                    : "bg-[#F7F5EE]/95 border-[#DCD6C4] shadow-[0_4px_20px_rgba(11,40,25,0.07)]"
                   : "bg-white/95 border-[#DCE7F8] shadow-[0_4px_20px_rgba(0,68,180,0.06)]"
           }`}
         >
           <div className="max-w-7xl mx-auto px-4 h-16 flex items-center justify-between gap-3">
-            {/* Logo: Same consistent GoTech logo across GoTech & Perfumes */}
+            {/* Logo: Smoothly adapts G-accent only inside Perfumes */}
             <Link
               to="/"
               className="flex items-center shrink-0 group transition-transform duration-500 ease-out hover:scale-[1.03]"
@@ -366,6 +372,7 @@ export default function Navbar() {
               <BrandLogo
                 variant="compact"
                 tone={isAdminTheme ? "dark" : "light"}
+                accentTone={logoAccentTone}
               />
             </Link>
 
@@ -387,8 +394,8 @@ export default function Navbar() {
                               ? detailPalette.detailNavLink
                               : isPerfumeTheme
                                 ? isPerfumeMujer
-                                  ? "font-playfair text-[#7A3555] hover:text-[#5C0E32]"
-                                  : "font-playfair text-[#285240] hover:text-[#063020]"
+                                  ? "font-playfair text-[#6E2C3E] hover:text-[#3B101C]"
+                                  : "font-playfair text-[#23392C] hover:text-[#0B2819]"
                                 : "text-[#334663] hover:text-[#0057FF]"
                         }`}
                       >
@@ -400,7 +407,7 @@ export default function Navbar() {
                     <Link
                       key={link.href}
                       to={link.href}
-                      className={`text-xs xl:text-sm font-semibold uppercase tracking-wider whitespace-nowrap transition-colors duration-500 ease-in-out ${
+                      className={`text-xs xl:text-sm font-semibold uppercase tracking-wider whitespace-nowrap transition-colors duration-700 ease-in-out ${
                         isAdminTheme
                           ? isActive
                             ? "text-neon-cyan glow-text"
@@ -412,11 +419,11 @@ export default function Navbar() {
                             : isPerfumeTheme
                               ? isPerfumeMujer
                                 ? isActive
-                                  ? "font-playfair text-[#5C0E32] border-b-2 border-[#A62660] pb-0.5"
-                                  : "font-playfair text-[#7A3555] hover:text-[#5C0E32]"
+                                  ? "font-playfair text-[#3B101C] border-b-2 border-[#8E1036] pb-0.5"
+                                  : "font-playfair text-[#6E2C3E] hover:text-[#3B101C]"
                                 : isActive
-                                  ? "font-playfair text-[#063020] border-b-2 border-[#0B4A31] pb-0.5"
-                                  : "font-playfair text-[#285240] hover:text-[#063020]"
+                                  ? "font-playfair text-[#0B2819] border-b-2 border-[#0B2819] pb-0.5"
+                                  : "font-playfair text-[#23392C] hover:text-[#0B2819]"
                               : isActive
                                 ? "text-[#0057FF] border-b-2 border-[#0057FF] pb-0.5"
                                 : "text-[#334663] hover:text-[#0057FF]"
@@ -432,15 +439,15 @@ export default function Navbar() {
               <div ref={desktopSearchRef} className="relative w-52 xl:w-64 shrink-0">
                 <form onSubmit={handleSearchSubmit} className="relative">
                   <Search
-                    className={`w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none transition-colors duration-500 ${
+                    className={`w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none transition-colors duration-700 ${
                       isAdminTheme
                         ? "text-neon-cyan/70"
                         : detailPalette
                           ? detailPalette.detailNavIcon
                           : isPerfumeTheme
                             ? isPerfumeMujer
-                              ? "text-[#A62660]"
-                              : "text-[#0B4A31]"
+                              ? "text-[#8E1036]"
+                              : "text-[#0B2819]"
                             : "text-[#0057FF]"
                     }`}
                   />
@@ -454,15 +461,15 @@ export default function Navbar() {
                     }}
                     placeholder="Buscar producto..."
                     aria-label="Buscar productos en todo el catálogo"
-                    className={`w-full rounded-full pl-9 pr-8 py-2 text-xs font-medium border focus:outline-none transition-all duration-500 ${
+                    className={`w-full rounded-full pl-9 pr-8 py-2 text-xs font-medium border focus:outline-none transition-all duration-700 ${
                       isAdminTheme
                         ? "bg-dark-700 border-neon-cyan/30 text-white placeholder-white/40 focus:border-neon-cyan"
                         : detailPalette
                           ? detailPalette.detailNavInput
                           : isPerfumeTheme
                             ? isPerfumeMujer
-                              ? "bg-white border-[#F0C4D7] text-[#5C0E32] placeholder-[#B07A92] focus:border-[#A62660]"
-                              : "bg-white border-[#C5DFD1] text-[#063020] placeholder-[#6B9382] focus:border-[#0B4A31]"
+                              ? "bg-[#FFF9F7] border-[#EBD0C9] text-[#3B101C] placeholder-[#9B6B76] focus:border-[#8E1036]"
+                              : "bg-[#FBF9F4] border-[#D7D0BE] text-[#0D2016] placeholder-[#6B7A70] focus:border-[#0B2819]"
                             : "bg-[#F4F8FF] border-[#CFE0FA] text-[#0B172A] placeholder-[#6B7E9E] focus:border-[#0057FF] focus:bg-white"
                     }`}
                   />
@@ -481,8 +488,8 @@ export default function Navbar() {
                             ? detailPalette.detailNavClear
                             : isPerfumeTheme
                               ? isPerfumeMujer
-                                ? "text-[#9F5977] hover:text-[#5C0E32]"
-                                : "text-[#4D7866] hover:text-[#063020]"
+                                ? "text-[#8F5262] hover:text-[#3B101C]"
+                                : "text-[#4D6456] hover:text-[#0B2819]"
                               : "text-[#6B7E9E] hover:text-[#0B172A]"
                       }`}
                     >
@@ -501,7 +508,7 @@ export default function Navbar() {
               {/* Cart button */}
               <button
                 onClick={openCart}
-                className={`relative flex items-center gap-2 rounded-xl px-3.5 py-2 transition-all duration-500 ease-in-out shrink-0 group ${
+                className={`relative flex items-center gap-2 rounded-xl px-3.5 py-2 transition-all duration-700 ease-in-out shrink-0 group ${
                   isAdminTheme
                     ? `bg-dark-700 border border-neon-cyan/20 hover:border-neon-cyan/60 hover:shadow-neon-sm ${
                         cartBounce ? "scale-110 border-neon-cyan shadow-neon" : ""
@@ -512,11 +519,11 @@ export default function Navbar() {
                         }`
                       : isPerfumeTheme
                         ? isPerfumeMujer
-                          ? `bg-white border border-[#F0C4D7] hover:border-[#A62660] ${
-                              cartBounce ? "scale-110 border-[#A62660] shadow-md" : ""
+                          ? `bg-[#FFF9F7] border border-[#EBD0C9] hover:border-[#8E1036] ${
+                              cartBounce ? "scale-110 border-[#8E1036] shadow-md" : ""
                             }`
-                          : `bg-white border border-[#C5DFD1] hover:border-[#0B4A31] ${
-                              cartBounce ? "scale-110 border-[#0B4A31] shadow-md" : ""
+                          : `bg-[#FBF9F4] border border-[#D7D0BE] hover:border-[#0B2819] ${
+                              cartBounce ? "scale-110 border-[#0B2819] shadow-md" : ""
                             }`
                         : `bg-[#F4F8FF] border border-[#CFE0FA] hover:border-[#0057FF] hover:shadow-sm ${
                             cartBounce ? "scale-110 border-[#0057FF] shadow-md" : ""
@@ -525,28 +532,28 @@ export default function Navbar() {
                 aria-label="Carrito"
               >
                 <ShoppingCart
-                  className={`w-4 h-4 transition-all duration-500 ease-in-out ${
+                  className={`w-4 h-4 transition-all duration-700 ease-in-out ${
                     isAdminTheme
                       ? "text-neon-cyan"
                       : detailPalette
                         ? detailPalette.detailNavIcon
                         : isPerfumeTheme
                           ? isPerfumeMujer
-                            ? "text-[#A62660]"
-                            : "text-[#0B4A31]"
+                            ? "text-[#8E1036]"
+                            : "text-[#0B2819]"
                           : "text-[#0057FF]"
                   } ${cartBounce ? "animate-bounce scale-125" : ""}`}
                 />
                 <span
-                  className={`text-xs xl:text-sm font-semibold transition-colors duration-500 ease-in-out ${
+                  className={`text-xs xl:text-sm font-semibold transition-colors duration-700 ease-in-out ${
                     isAdminTheme
                       ? "text-white/70 group-hover:text-white"
                       : detailPalette
                         ? `font-playfair ${detailPalette.price}`
                         : isPerfumeTheme
                           ? isPerfumeMujer
-                            ? "font-playfair text-[#5C0E32]"
-                            : "font-playfair text-[#063020]"
+                            ? "font-playfair text-[#3B101C]"
+                            : "font-playfair text-[#0D2016]"
                           : "text-[#0B172A]"
                   }`}
                 >
@@ -554,15 +561,15 @@ export default function Navbar() {
                 </span>
                 {totalItems > 0 && (
                   <span
-                    className={`absolute -top-2 -right-2 font-black text-[10px] w-5 h-5 rounded-full flex items-center justify-center transition-colors duration-500 ease-in-out ${
+                    className={`absolute -top-2 -right-2 font-black text-[10px] w-5 h-5 rounded-full flex items-center justify-center transition-colors duration-700 ease-in-out ${
                       isAdminTheme
                         ? "bg-neon-cyan text-dark-900 animate-pulse-neon"
                         : detailPalette
                           ? detailPalette.detailNavCartBtn
                           : isPerfumeTheme
                             ? isPerfumeMujer
-                              ? "bg-[#A62660] text-[#FFF8FB]"
-                              : "bg-[#0B4A31] text-[#F7FBF9]"
+                              ? "bg-[#8E1036] text-[#FFF9F7]"
+                              : "bg-[#0B2819] text-[#FBF9F4]"
                             : "bg-[#0057FF] text-white shadow-sm"
                     }`}
                   >
@@ -579,11 +586,11 @@ export default function Navbar() {
                   isAdminTheme
                     ? "btn-neon text-xs px-4 py-2 shrink-0 transition-all duration-500"
                     : detailPalette
-                      ? `font-playfair ${detailPalette.detailNavCartBtn} font-bold tracking-wider text-xs px-4 py-2.5 rounded-full shrink-0 transition-all duration-500 ease-in-out shadow-sm`
+                      ? `font-playfair ${detailPalette.detailNavCartBtn} font-bold tracking-wider text-xs px-4 py-2.5 rounded-full shrink-0 transition-all duration-700 ease-in-out shadow-sm`
                       : isPerfumeTheme
                         ? isPerfumeMujer
-                          ? "font-playfair bg-[#A62660] hover:bg-[#C23273] text-[#FFF8FB] font-bold tracking-wider text-xs px-4 py-2.5 rounded-full shrink-0 transition-all duration-500 ease-in-out shadow-sm"
-                          : "font-playfair bg-[#0B4A31] hover:bg-[#116443] text-[#F7FBF9] font-bold tracking-wider text-xs px-4 py-2.5 rounded-full shrink-0 transition-all duration-500 ease-in-out shadow-sm"
+                          ? "font-playfair bg-[#8E1036] hover:bg-[#AA1B46] text-[#FFF9F7] border border-[#C8A158]/50 font-bold tracking-wider text-xs px-4 py-2.5 rounded-full shrink-0 transition-all duration-700 ease-in-out shadow-sm"
+                          : "font-playfair bg-[#0B2819] hover:bg-[#144029] text-[#FBF9F4] border border-[#B6985A]/50 font-bold tracking-wider text-xs px-4 py-2.5 rounded-full shrink-0 transition-all duration-700 ease-in-out shadow-sm"
                         : "btn-gotech text-xs px-4 py-2.5 uppercase tracking-wider shrink-0 transition-all duration-500 ease-in-out"
                 }
               >
@@ -600,15 +607,15 @@ export default function Navbar() {
                   setSearchFocused(true);
                   setOpen(false);
                 }}
-                className={`p-2 rounded-xl transition-colors duration-500 ease-in-out ${
+                className={`p-2 rounded-xl transition-colors duration-700 ease-in-out ${
                   isAdminTheme
                     ? "text-neon-cyan hover:bg-dark-700"
                     : detailPalette
                       ? `${detailPalette.detailNavIcon} hover:bg-white/60`
                       : isPerfumeTheme
                         ? isPerfumeMujer
-                          ? "text-[#A62660] hover:bg-white/60"
-                          : "text-[#0B4A31] hover:bg-white/60"
+                          ? "text-[#2A1118] hover:bg-white/60"
+                          : "text-[#0D2016] hover:bg-white/60"
                         : "text-[#0B172A] hover:bg-[#F4F8FF]"
                 }`}
                 aria-label="Buscar productos"
@@ -622,15 +629,15 @@ export default function Navbar() {
 
               <button
                 onClick={openCart}
-                className={`relative p-2 transition-all duration-500 ease-in-out ${
+                className={`relative p-2 transition-all duration-700 ease-in-out ${
                   isAdminTheme
                     ? "text-neon-cyan"
                     : detailPalette
                       ? detailPalette.detailNavIcon
                       : isPerfumeTheme
                         ? isPerfumeMujer
-                          ? "text-[#A62660]"
-                          : "text-[#0B4A31]"
+                          ? "text-[#2A1118]"
+                          : "text-[#0D2016]"
                         : "text-[#0B172A]"
                 } ${cartBounce ? "scale-125" : ""}`}
                 aria-label="Carrito"
@@ -640,15 +647,15 @@ export default function Navbar() {
                 />
                 {totalItems > 0 && (
                   <span
-                    className={`absolute -top-0.5 -right-0.5 font-black text-[9px] w-4 h-4 rounded-full flex items-center justify-center transition-colors duration-500 ease-in-out ${
+                    className={`absolute -top-0.5 -right-0.5 font-black text-[9px] w-4 h-4 rounded-full flex items-center justify-center transition-colors duration-700 ease-in-out ${
                       isAdminTheme
                         ? "bg-neon-cyan text-dark-900"
                         : detailPalette
                           ? detailPalette.detailNavCartBtn
                           : isPerfumeTheme
                             ? isPerfumeMujer
-                              ? "bg-[#A62660] text-[#FFF8FB]"
-                              : "bg-[#0B4A31] text-[#F7FBF9]"
+                              ? "bg-[#8E1036] text-[#FFF9F7]"
+                              : "bg-[#0B2819] text-[#FBF9F4]"
                             : "bg-[#0057FF] text-white"
                     }`}
                   >
@@ -662,15 +669,15 @@ export default function Navbar() {
                   setOpen(!open);
                   setSearchOpenMobile(false);
                 }}
-                className={`p-2 transition-colors duration-500 ease-in-out ${
+                className={`p-2 transition-colors duration-700 ease-in-out ${
                   isAdminTheme
                     ? "text-neon-cyan"
                     : detailPalette
                       ? detailPalette.detailNavIcon
                       : isPerfumeTheme
                         ? isPerfumeMujer
-                          ? "text-[#A62660]"
-                          : "text-[#0B4A31]"
+                          ? "text-[#2A1118]"
+                          : "text-[#0D2016]"
                         : "text-[#0B172A]"
                 }`}
                 aria-label="Toggle menu"
@@ -691,8 +698,8 @@ export default function Navbar() {
                     ? detailPalette.detailNavMobilePanel
                     : isPerfumeTheme
                       ? isPerfumeMujer
-                        ? "bg-[#FFF8FB] border-[#F0C4D7]"
-                        : "bg-[#F7FBF9] border-[#C5DFD1]"
+                        ? "bg-[#FFF9F7] border-[#EBD0C9]"
+                        : "bg-[#FBF9F4] border-[#D7D0BE]"
                       : "bg-white border-[#DCE7F8]"
               }`}
             >
@@ -705,8 +712,8 @@ export default function Navbar() {
                         ? detailPalette.detailNavIcon
                         : isPerfumeTheme
                           ? isPerfumeMujer
-                            ? "text-[#A62660]"
-                            : "text-[#0B4A31]"
+                            ? "text-[#8E1036]"
+                            : "text-[#0B2819]"
                           : "text-[#0057FF]"
                   }`}
                 />
@@ -728,8 +735,8 @@ export default function Navbar() {
                         ? detailPalette.detailNavInput
                         : isPerfumeTheme
                           ? isPerfumeMujer
-                            ? "bg-white border-[#F0C4D7] text-[#5C0E32] placeholder-[#B07A92] focus:border-[#A62660]"
-                            : "bg-white border-[#C5DFD1] text-[#063020] placeholder-[#6B9382] focus:border-[#0B4A31]"
+                            ? "bg-white border-[#EBD0C9] text-[#3B101C] placeholder-[#9B6B76] focus:border-[#8E1036]"
+                            : "bg-white border-[#D7D0BE] text-[#0D2016] placeholder-[#6B7A70] focus:border-[#0B2819]"
                           : "bg-[#F4F8FF] border-[#CFE0FA] text-[#0B172A] placeholder-[#6B7E9E] focus:border-[#0057FF]"
                   }`}
                 />
@@ -745,8 +752,8 @@ export default function Navbar() {
                           ? detailPalette.detailNavClear
                           : isPerfumeTheme
                             ? isPerfumeMujer
-                              ? "text-[#9F5977] hover:text-[#5C0E32]"
-                              : "text-[#4D7866] hover:text-[#063020]"
+                              ? "text-[#8F5262] hover:text-[#3B101C]"
+                              : "text-[#4D6456] hover:text-[#0B2819]"
                             : "text-[#6B7E9E] hover:text-[#0B172A]"
                     }`}
                   >
@@ -761,15 +768,15 @@ export default function Navbar() {
           {/* Mobile Menu */}
           {open && (
             <div
-              className={`lg:hidden border-t animate-fade-in transition-colors duration-500 ease-in-out ${
+              className={`lg:hidden border-t animate-fade-in transition-colors duration-700 ease-in-out ${
                 isAdminTheme
                   ? "bg-dark-800 border-neon-cyan/20"
                   : detailPalette
                     ? detailPalette.detailNavMobilePanel
                     : isPerfumeTheme
                       ? isPerfumeMujer
-                        ? "bg-[#FFF8FB] border-[#F0C4D7]"
-                        : "bg-[#F7FBF9] border-[#C5DFD1]"
+                        ? "bg-[#FFF9F7] border-[#EBD0C9]"
+                        : "bg-[#FBF9F4] border-[#D7D0BE]"
                       : "bg-white border-[#DCE7F8] shadow-lg"
               }`}
             >
@@ -789,8 +796,8 @@ export default function Navbar() {
                             ? detailPalette.detailNavMobileLink
                             : isPerfumeTheme
                               ? isPerfumeMujer
-                                ? "font-playfair border-[#F5D6E3] text-[#7A3555] hover:text-[#5C0E32]"
-                                : "font-playfair border-[#D4E7DC] text-[#285240] hover:text-[#063020]"
+                                ? "font-playfair border-[#F2DCD7] text-[#6E2C3E] hover:text-[#3B101C]"
+                                : "font-playfair border-[#E4DEC9] text-[#23392C] hover:text-[#0B2819]"
                               : "border-[#EEF4FF] text-[#334663] hover:text-[#0057FF]"
                       }`}
                     >
@@ -816,15 +823,15 @@ export default function Navbar() {
                             }`
                           : isPerfumeTheme
                             ? isPerfumeMujer
-                              ? `font-playfair border-[#F5D6E3] ${
+                              ? `font-playfair border-[#F2DCD7] ${
                                   isActive
-                                    ? "text-[#5C0E32] font-bold"
-                                    : "text-[#7A3555] hover:text-[#5C0E32]"
+                                    ? "text-[#3B101C] font-bold"
+                                    : "text-[#6E2C3E] hover:text-[#3B101C]"
                                 }`
-                              : `font-playfair border-[#D4E7DC] ${
+                              : `font-playfair border-[#E4DEC9] ${
                                   isActive
-                                    ? "text-[#063020] font-bold"
-                                    : "text-[#285240] hover:text-[#063020]"
+                                    ? "text-[#0B2819] font-bold"
+                                    : "text-[#23392C] hover:text-[#0B2819]"
                                 }`
                             : `border-[#EEF4FF] ${
                                 isActive
@@ -848,8 +855,8 @@ export default function Navbar() {
                       ? `font-playfair ${detailPalette.detailNavIcon}`
                       : isPerfumeTheme
                         ? isPerfumeMujer
-                          ? "font-playfair text-[#A62660]"
-                          : "font-playfair text-[#0B4A31]"
+                          ? "font-playfair text-[#8E1036]"
+                          : "font-playfair text-[#0B2819]"
                         : "text-[#0057FF]"
                 }`}
               >

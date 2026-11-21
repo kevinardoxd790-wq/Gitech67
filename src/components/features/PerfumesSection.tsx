@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react";
+import { useState } from "react";
 import { Link } from "react-router-dom";
 import { ShoppingCart, Plus, Truck, ArrowRight, Search } from "lucide-react";
 import { useCatalog } from "@/hooks/useCatalog";
@@ -7,25 +7,13 @@ import { usePerfumeTheme } from "@/hooks/usePerfumeZone";
 import { WHATSAPP_NUMBER } from "@/constants/products";
 import { getPerfumeCardPalette } from "@/constants/perfumePalettes";
 
-const PERFUME_TITLE_LETTERS = "PERFUMES".split("");
+const MUJER_HERO_IMG =
+  "/src/assets/images/perfume_hero_mujer_1795232269310.jpg";
+const HOMBRE_HERO_IMG =
+  "/src/assets/images/perfume_hero_hombre_1795232269618.jpg";
 
 interface PerfumesSectionProps {
   standalone?: boolean;
-}
-
-interface ScrollState {
-  enterProgress: number; // 0 -> 1 as section enters viewport
-  letterRise: number; // 0 -> 1 just before & upon reaching Perfumes
-  parallaxOffset: number; // -1 -> 1 across section scroll travel
-}
-
-function clamp01(val: number): number {
-  return Math.max(0, Math.min(1, val));
-}
-
-function easeOutCubic(t: number): number {
-  const c = clamp01(t);
-  return 1 - Math.pow(1 - c, 3);
 }
 
 export default function PerfumesSection({
@@ -35,78 +23,12 @@ export default function PerfumesSection({
   const { items, addToCart } = useCart();
   const { perfumeGender, setPerfumeGender } = usePerfumeTheme();
   const [search, setSearch] = useState("");
-  const sectionRef = useRef<HTMLElement>(null);
+  const [heroImgFailed, setHeroImgFailed] = useState<{
+    mujer?: boolean;
+    hombre?: boolean;
+  }>({});
 
   const isMujer = perfumeGender === "mujer";
-
-  const [scrollState, setScrollState] = useState<ScrollState>(() => ({
-    enterProgress: standalone ? 1 : 0.15,
-    letterRise: standalone ? 1 : 0,
-    parallaxOffset: 0,
-  }));
-
-  useEffect(() => {
-    const prefersReducedMotion =
-      typeof window !== "undefined" &&
-      window.matchMedia("(prefers-reduced-motion: reduce)").matches;
-
-    if (standalone || prefersReducedMotion) {
-      setScrollState({
-        enterProgress: 1,
-        letterRise: 1,
-        parallaxOffset: 0,
-      });
-      return;
-    }
-
-    let rafId: number | null = null;
-
-    const updateFromScroll = () => {
-      rafId = null;
-      const el = sectionRef.current;
-      if (!el) return;
-
-      const rect = el.getBoundingClientRect();
-      const vh = window.innerHeight || 800;
-
-      // Gradual atmospheric transition from normal GoTech into Perfumes luxury stage
-      const rawEnter = (vh * 1.05 - rect.top) / (vh * 0.85);
-      const enterProgress = easeOutCubic(rawEnter);
-
-      // Letters begin rising as the user almost reaches Perfumes
-      const rawRise = (vh * 0.96 - rect.top) / (vh * 0.56);
-      const letterRise = easeOutCubic(rawRise);
-
-      // Continuous position inside viewport (-1 entering from bottom -> +1 scrolling past)
-      const sectionCenter = rect.top + rect.height * 0.35;
-      const normalizedCenter = (vh * 0.5 - sectionCenter) / (vh * 0.85);
-      const parallaxOffset = Math.max(-1, Math.min(1, normalizedCenter));
-
-      setScrollState({
-        enterProgress,
-        letterRise,
-        parallaxOffset,
-      });
-    };
-
-    const scheduleUpdate = () => {
-      if (rafId === null) {
-        rafId = window.requestAnimationFrame(updateFromScroll);
-      }
-    };
-
-    updateFromScroll();
-    window.addEventListener("scroll", scheduleUpdate, { passive: true });
-    window.addEventListener("resize", scheduleUpdate, { passive: true });
-
-    return () => {
-      window.removeEventListener("scroll", scheduleUpdate);
-      window.removeEventListener("resize", scheduleUpdate);
-      if (rafId !== null) {
-        window.cancelAnimationFrame(rafId);
-      }
-    };
-  }, [standalone]);
 
   const perfumeProducts = products.filter((p) =>
     p.category.toLowerCase().includes("perfume")
@@ -134,297 +56,295 @@ export default function PerfumesSection({
     return matchesGender && matchesSearch;
   });
 
-  const { enterProgress, letterRise, parallaxOffset } = scrollState;
+  const scrollToCatalog = () => {
+    const el = document.getElementById("perfumes-catalogo");
+    if (el) {
+      el.scrollIntoView({ behavior: "smooth", block: "start" });
+    }
+  };
 
   return (
     <section
       id="perfumes"
-      ref={sectionRef}
-      className={`relative overflow-hidden transition-colors duration-700 ${
+      className={`relative overflow-hidden transition-colors duration-700 ease-in-out ${
         isMujer
-          ? "text-[#5C0E32] bg-[#FFF1F6]"
-          : "text-[#063020] bg-[#EEF7F2]"
+          ? "text-[#3B101C] bg-[#FDF2F0]"
+          : "text-[#0D2016] bg-[#F7F5EE]"
       }`}
     >
-      {/* Band 1: Luxury Emerald Green (Hombre default) / Velvet Rose (Mujer) Hero Stage */}
-      <div
-        className={`relative overflow-hidden ${
-          standalone
-            ? "pt-12 pb-20 sm:pt-16 sm:pb-24"
-            : "pt-24 pb-24 sm:pt-32 sm:pb-28"
-        }`}
-      >
-        {/* Cross-fading Emerald Green Backdrop (Hombre) */}
+      {/* Top gradual cross-fading transition when embedded inside Home (/) */}
+      {!standalone && (
+        <div className="relative h-8 sm:h-10 w-full overflow-hidden" aria-hidden="true">
+          <div
+            className={`absolute inset-0 transition-opacity duration-700 ease-in-out ${
+              isMujer ? "opacity-100" : "opacity-0"
+            }`}
+            style={{
+              background:
+                "linear-gradient(180deg, #F4F8FF 0%, #EDE3EC 50%, #5B0A22 100%)",
+            }}
+          />
+          <div
+            className={`absolute inset-0 transition-opacity duration-700 ease-in-out ${
+              isMujer ? "opacity-0" : "opacity-100"
+            }`}
+            style={{
+              background:
+                "linear-gradient(180deg, #F4F8FF 0%, #CFDCD8 50%, #061A0F 100%)",
+            }}
+          />
+        </div>
+      )}
+
+      {/* Band 1: Full-Bleed Photographic Luxury Campaign Hero */}
+      <div className="relative w-full overflow-hidden bg-[#12070B]">
+        {/* Fallback Luxury Gradient Canvas if image fails */}
         <div
           aria-hidden="true"
-          className={`pointer-events-none absolute inset-0 transition-opacity duration-700 ease-in-out ${
+          className={`absolute inset-0 transition-opacity duration-700 ease-in-out ${
+            isMujer ? "opacity-100" : "opacity-0"
+          }`}
+          style={{
+            background:
+              "radial-gradient(circle at 75% 45%, #D96889 0%, #8C1338 45%, #4A051A 100%)",
+          }}
+        />
+        <div
+          aria-hidden="true"
+          className={`absolute inset-0 transition-opacity duration-700 ease-in-out ${
             isMujer ? "opacity-0" : "opacity-100"
           }`}
           style={{
-            background: standalone
-              ? "linear-gradient(180deg, #042417 0%, #093E29 54%, #4D8A70 82%, #D7ECE2 93%, #EEF7F2 100%)"
-              : "linear-gradient(180deg, #EEF4FF 0%, #B8D8CA 15%, #0B4A31 36%, #042417 60%, #1C6949 78%, #D7ECE2 92%, #EEF7F2 100%)",
+            background:
+              "radial-gradient(circle at 75% 45%, #1F5134 0%, #0A2416 48%, #040F09 100%)",
           }}
         />
 
-        {/* Cross-fading Luxury Rose Backdrop (Mujer) */}
+        {/* Cross-fading Hero Photography */}
+        {!heroImgFailed.mujer && (
+          <img
+            src={MUJER_HERO_IMG}
+            alt="Colección Femenina de Perfumes GoTech"
+            referrerPolicy="no-referrer"
+            onError={() =>
+              setHeroImgFailed((prev) => ({ ...prev, mujer: true }))
+            }
+            className={`absolute inset-0 w-full h-full object-cover object-[78%_center] sm:object-center transition-all duration-700 ease-in-out select-none pointer-events-none ${
+              isMujer ? "opacity-100 scale-100" : "opacity-0 scale-[1.02]"
+            }`}
+          />
+        )}
+        {!heroImgFailed.hombre && (
+          <img
+            src={HOMBRE_HERO_IMG}
+            alt="Colección Masculina de Perfumes GoTech"
+            referrerPolicy="no-referrer"
+            onError={() =>
+              setHeroImgFailed((prev) => ({ ...prev, hombre: true }))
+            }
+            className={`absolute inset-0 w-full h-full object-cover object-[78%_center] sm:object-center transition-all duration-700 ease-in-out select-none pointer-events-none ${
+              isMujer ? "opacity-0 scale-[1.02]" : "opacity-100 scale-100"
+            }`}
+          />
+        )}
+
+        {/* Measured Contrast Scrims so left typography remains >7:1 legible */}
         <div
           aria-hidden="true"
           className={`pointer-events-none absolute inset-0 transition-opacity duration-700 ease-in-out ${
             isMujer ? "opacity-100" : "opacity-0"
           }`}
           style={{
-            background: standalone
-              ? "linear-gradient(180deg, #6E133D 0%, #9E245B 54%, #D97AA3 82%, #F9DCE8 93%, #FFF1F6 100%)"
-              : "linear-gradient(180deg, #EEF4FF 0%, #EABBD0 15%, #A62660 36%, #6E133D 60%, #C4477E 78%, #F9DCE8 92%, #FFF1F6 100%)",
+            background:
+              "linear-gradient(90deg, rgba(72, 6, 26, 0.84) 0%, rgba(102, 11, 40, 0.62) 42%, rgba(102, 11, 40, 0.14) 70%, transparent 100%)",
           }}
         />
-
-        {/* Scroll-driven atmospheric veil that gradually dissolves as you enter Perfumes */}
-        {!standalone && (
-          <div
-            aria-hidden="true"
-            className="pointer-events-none absolute inset-0 z-0"
-            style={{
-              background:
-                "radial-gradient(ellipse 95% 75% at 50% 18%, rgba(244, 248, 255, 0.78), rgba(234, 242, 255, 0.65) 70%)",
-              opacity: clamp01((1 - enterProgress) * 0.85),
-              transform: `translate3d(0, ${parallaxOffset * -16}px, 0)`,
-            }}
-          />
-        )}
-
-        {/* Scroll-reactive luxury champagne glow behind the display typography */}
         <div
           aria-hidden="true"
-          className="pointer-events-none absolute top-1/2 left-1/2 w-[780px] max-w-[130vw] h-[340px] -translate-x-1/2 -translate-y-1/2 rounded-full blur-3xl z-0 transition-all duration-700"
+          className={`pointer-events-none absolute inset-0 transition-opacity duration-700 ease-in-out ${
+            isMujer ? "opacity-0" : "opacity-100"
+          }`}
           style={{
-            background: isMujer
-              ? "radial-gradient(circle, rgba(255, 226, 238, 0.28) 0%, rgba(194, 50, 115, 0.28) 50%, transparent 75%)"
-              : "radial-gradient(circle, rgba(232, 207, 142, 0.22) 0%, rgba(20, 110, 74, 0.28) 50%, transparent 75%)",
-            opacity: 0.35 + enterProgress * 0.65,
-            transform: `translate3d(-50%, calc(-50% + ${
-              parallaxOffset * 28
-            }px), 0) scale(${0.94 + enterProgress * 0.12})`,
+            background:
+              "linear-gradient(90deg, rgba(3, 15, 9, 0.88) 0%, rgba(7, 27, 16, 0.65) 44%, rgba(7, 27, 16, 0.14) 72%, transparent 100%)",
           }}
         />
 
-        {/* Rising & Floating Luxury Display Centerpiece */}
-        <div
-          className="relative z-10 max-w-4xl mx-auto px-4 text-center space-y-5"
-          style={{
-            transform: `translate3d(0, ${parallaxOffset * -12}px, 0)`,
-          }}
-        >
-          {/* Minimalist Flacon Emblem + Luxury Cinzel Eyebrow */}
-          <div
-            className="flex flex-col items-center gap-3"
-            style={{
-              opacity: clamp01(0.25 + letterRise * 0.75),
-              transform: `translate3d(0, ${(1 - letterRise) * 42}px, 0)`,
-            }}
-          >
-            <svg
-              viewBox="0 0 48 48"
-              fill="none"
-              aria-hidden="true"
-              className={`w-10 h-10 transition-colors duration-700 ${
-                isMujer ? "text-[#FFE4EF]" : "text-[#EFE1B8]"
-              }`}
-            >
-              <rect
-                x="18"
-                y="6"
-                width="12"
-                height="6"
-                rx="1.5"
-                stroke="currentColor"
-                strokeWidth="2.2"
+        {/* Hero Typography Overlay (Left Campaign Stack) */}
+        <div className="relative z-10 max-w-7xl mx-auto px-5 sm:px-8 lg:px-12 py-12 sm:py-16 lg:py-24 min-h-[340px] sm:min-h-[430px] lg:min-h-[520px] flex items-center">
+          <div className="w-[78%] sm:w-[60%] md:w-[56%] lg:w-[52%] flex flex-col items-center text-center">
+            {/* Top Hairline Eyebrow */}
+            <div className="flex items-center justify-center gap-3 sm:gap-4 w-full max-w-md">
+              <span
+                aria-hidden="true"
+                className="flex-1 max-w-[72px] h-px bg-gradient-to-r from-transparent to-[#E3C57E]/90"
               />
-              <path
-                d="M21 12v4h6v-4"
-                stroke="currentColor"
-                strokeWidth="2.2"
+              <span className="font-montserrat text-[9px] sm:text-[11px] font-medium uppercase tracking-[0.34em] text-[#F9EED7] whitespace-nowrap">
+                Boutique GoTech
+              </span>
+              <span
+                aria-hidden="true"
+                className="flex-1 max-w-[72px] h-px bg-gradient-to-l from-transparent to-[#E3C57E]/90"
               />
-              <rect
-                x="11"
-                y="16"
-                width="26"
-                height="24"
-                rx="6"
-                stroke="currentColor"
-                strokeWidth="2.2"
-              />
-              <path
-                d="M34 9l5-2M35 13l5 1M34 5l4-3"
-                stroke="currentColor"
-                strokeWidth="1.8"
-                strokeLinecap="round"
-              />
-            </svg>
-            <p
-              className={`font-cinzel text-[11px] sm:text-xs font-bold uppercase tracking-[0.28em] sm:tracking-[0.36em] transition-colors duration-700 ${
-                isMujer ? "text-[#FFE2EE]" : "text-[#EFE1B8]"
-              }`}
-            >
-              Boutique GoTech · Alta Perfumería
+            </div>
+
+            {/* COLECCIÓN */}
+            <p className="mt-2.5 sm:mt-3 font-bodoni uppercase font-medium text-base sm:text-2xl lg:text-[26px] tracking-[0.32em] text-[#FFFDF9]/95 leading-tight drop-shadow-[0_2px_10px_rgba(0,0,0,0.45)]">
+              Colección
             </p>
-          </div>
 
-          {/* Highlighted Rising + Floating Luxury Letters */}
-          <h2
-            aria-label="PERFUMES"
-            className="font-cinzel font-extrabold text-[clamp(2rem,8.4vw,5.2rem)] tracking-[0.14em] sm:tracking-[0.2em] leading-none select-none flex items-center justify-center flex-nowrap whitespace-nowrap gap-x-0.5 sm:gap-x-2"
-          >
-            {PERFUME_TITLE_LETTERS.map((char, idx) => {
-              const staggered = clamp01(
-                (letterRise - idx * 0.045) /
-                  (1 - PERFUME_TITLE_LETTERS.length * 0.03)
-              );
-              const eased = easeOutCubic(staggered);
-              const riseY = (1 - eased) * (72 + idx * 5);
+            {/* Cross-fading FEMENINA / MASCULINA Main Display Title */}
+            <div className="relative mt-0.5 sm:mt-1 w-full flex items-center justify-center">
+              <h2
+                aria-hidden={!isMujer}
+                className={`font-luxury uppercase font-normal text-[clamp(2.1rem,5.9vw,4.75rem)] leading-[0.98] tracking-[0.04em] text-white drop-shadow-[0_6px_22px_rgba(0,0,0,0.5)] transition-all duration-700 ease-in-out whitespace-nowrap ${
+                  isMujer
+                    ? "opacity-100 translate-y-0"
+                    : "opacity-0 -translate-y-2 pointer-events-none select-none"
+                }`}
+              >
+                Femenina
+              </h2>
+              <h2
+                aria-hidden={isMujer}
+                className={`absolute inset-0 flex items-center justify-center font-luxury uppercase font-normal text-[clamp(2.1rem,5.9vw,4.75rem)] leading-[0.98] tracking-[0.04em] text-white drop-shadow-[0_6px_22px_rgba(0,0,0,0.5)] transition-all duration-700 ease-in-out whitespace-nowrap ${
+                  !isMujer
+                    ? "opacity-100 translate-y-0"
+                    : "opacity-0 translate-y-2 pointer-events-none select-none"
+                }`}
+              >
+                Masculina
+              </h2>
+            </div>
 
-              return (
+            {/* Cross-fading Subtitle with Hairlines */}
+            <div className="mt-2.5 sm:mt-3.5 flex items-center justify-center gap-2.5 sm:gap-4 w-full max-w-md">
+              <span
+                aria-hidden="true"
+                className="flex-1 max-w-[56px] h-px bg-gradient-to-r from-transparent to-[#E3C57E]/85"
+              />
+              <div className="relative inline-flex items-center justify-center">
                 <span
-                  key={`${char}-${idx}`}
-                  style={{
-                    opacity: clamp01(0.2 + eased * 0.8),
-                    transform: `translate3d(0, ${riseY}px, 0)`,
-                  }}
+                  aria-hidden={!isMujer}
+                  className={`font-montserrat text-[10px] sm:text-xs font-medium uppercase tracking-[0.28em] text-[#F6E9CE] whitespace-nowrap transition-all duration-700 ease-in-out ${
+                    isMujer
+                      ? "opacity-100 translate-y-0"
+                      : "opacity-0 -translate-y-1.5 pointer-events-none select-none"
+                  }`}
                 >
-                  <span
-                    className={`perfume-float-letter transition-colors duration-700 ${
-                      isMujer ? "text-[#FFF9FB]" : "text-[#FBFDFC]"
-                    }`}
-                    style={{
-                      animationDelay: `${idx * 0.16}s`,
-                      animationDuration: `${3.8 + (idx % 3) * 0.45}s`,
-                      textShadow: isMujer
-                        ? "0 6px 26px rgba(72, 6, 36, 0.55), 0 0 24px rgba(255, 224, 238, 0.35)"
-                        : "0 6px 26px rgba(2, 24, 15, 0.65), 0 0 24px rgba(232, 207, 142, 0.32)",
-                    }}
-                  >
-                    {char}
-                  </span>
+                  Perfumes para Mujer
                 </span>
-              );
-            })}
-          </h2>
+                <span
+                  aria-hidden={isMujer}
+                  className={`absolute inset-0 flex items-center justify-center font-montserrat text-[10px] sm:text-xs font-medium uppercase tracking-[0.28em] text-[#F6E9CE] whitespace-nowrap transition-all duration-700 ease-in-out ${
+                    !isMujer
+                      ? "opacity-100 translate-y-0"
+                      : "opacity-0 translate-y-1.5 pointer-events-none select-none"
+                  }`}
+                >
+                  Perfumes para Hombre
+                </span>
+              </div>
+              <span
+                aria-hidden="true"
+                className="flex-1 max-w-[56px] h-px bg-gradient-to-l from-transparent to-[#E3C57E]/85"
+              />
+            </div>
 
-          {/* Hairline Luxury Editorial Subtitle */}
-          <div
-            className="flex items-center justify-center gap-3 sm:gap-4 pt-1"
-            style={{
-              opacity: clamp01(0.22 + letterRise * 0.78),
-              transform: `translate3d(0, ${(1 - letterRise) * 48}px, 0)`,
-            }}
-          >
-            <span
-              aria-hidden="true"
-              className={`h-px w-10 sm:w-24 bg-gradient-to-r from-transparent transition-colors duration-700 ${
-                isMujer ? "to-[#FFD6E7]/80" : "to-[#E8CF8E]/80"
-              }`}
-            />
-            <p
-              className={`font-cormorant italic font-semibold text-xl sm:text-3xl tracking-wider transition-colors duration-700 ${
-                isMujer ? "text-[#FFF4F8]" : "text-[#F6FBF8]"
+            {/* Luxury Gold-Bordered Pill CTA with Smooth Cross-fading Fill */}
+            <button
+              type="button"
+              onClick={scrollToCatalog}
+              className={`relative overflow-hidden mt-5 sm:mt-7 inline-flex items-center gap-2.5 sm:gap-3 px-6 sm:px-8 py-2.5 sm:py-3 rounded-full border text-[11px] sm:text-xs font-montserrat font-medium uppercase tracking-[0.26em] text-[#FFFDF8] whitespace-nowrap shrink-0 transition-all duration-700 ease-in-out active:scale-[0.98] ${
+                isMujer
+                  ? "border-[#DFC078] shadow-[0_0_0_2px_rgba(62,4,21,0.45),inset_0_0_0_1px_rgba(246,223,163,0.4),0_10px_28px_rgba(0,0,0,0.38)]"
+                  : "border-[#CEAF6C] shadow-[0_0_0_2px_rgba(3,15,9,0.5),inset_0_0_0_1px_rgba(230,206,146,0.35),0_10px_28px_rgba(0,0,0,0.45)]"
               }`}
             >
-              {isMujer
-                ? "Esencia femenina · Aroma que deja huella"
-                : "Distinción masculina · Aroma que deja huella"}
-            </p>
-            <span
-              aria-hidden="true"
-              className={`h-px w-10 sm:w-24 bg-gradient-to-l from-transparent transition-colors duration-700 ${
-                isMujer ? "to-[#FFD6E7]/80" : "to-[#E8CF8E]/80"
-              }`}
-            />
+              <span
+                aria-hidden="true"
+                className={`absolute inset-0 bg-[#5D0721]/90 hover:bg-[#7A0C2D] transition-opacity duration-700 ease-in-out ${
+                  isMujer ? "opacity-100" : "opacity-0"
+                }`}
+              />
+              <span
+                aria-hidden="true"
+                className={`absolute inset-0 bg-[#061C10]/90 hover:bg-[#0E311E] transition-opacity duration-700 ease-in-out ${
+                  isMujer ? "opacity-0" : "opacity-100"
+                }`}
+              />
+              <span className="relative z-10">Descubre tu aroma</span>
+              <ArrowRight className="relative z-10 w-3.5 h-3.5 text-[#EED597]" />
+            </button>
           </div>
         </div>
       </div>
 
-      {/* Band 2: Luminous Alabaster-Mint (Hombre) / Luminous Blush-Rose (Mujer) Catalog Surface */}
-      <div
-        className={`transition-colors duration-700 ${
-          isMujer
-            ? "bg-gradient-to-b from-[#FFF1F6] via-[#FFF8FB] to-[#FCE4EE]"
-            : "bg-gradient-to-b from-[#EEF7F2] via-[#F7FBF9] to-[#E2F0E9]"
-        }`}
-      >
+      {/* Band 2: Smooth Cross-fading Warm Blush Cream (Mujer) / Warm Alabaster Ivory (Hombre) */}
+      <div className="relative">
         <div
-          className={`max-w-7xl mx-auto px-4 lg:px-8 space-y-10 ${
-            standalone ? "pt-4 pb-14 md:pb-16" : "pt-4 pb-16 md:pb-20"
+          aria-hidden="true"
+          className={`pointer-events-none absolute inset-0 transition-opacity duration-700 ease-in-out ${
+            isMujer ? "opacity-100" : "opacity-0"
           }`}
-        >
-          {/* Floating Section Header + Strictly 2 Gender Buttons (Hombre & Mujer) */}
-          <div
-            className={`flex flex-col lg:flex-row lg:items-end justify-between gap-6 border-b pb-6 transition-colors duration-700 ${
-              isMujer ? "border-[#F0C4D7]" : "border-[#C5DFD1]"
-            }`}
-            style={{
-              opacity: clamp01(0.35 + letterRise * 0.65),
-              transform: `translate3d(0, ${(1 - letterRise) * 28}px, 0)`,
-            }}
-          >
-            <div className="space-y-2">
-              <p
-                className={`font-cinzel text-xs font-bold uppercase tracking-[0.24em] transition-colors duration-700 ${
-                  isMujer ? "text-[#A62660]" : "text-[#0C593B]"
-                }`}
-              >
-                {isMujer
-                  ? "Boutique GoTech · Colección Femenina"
-                  : "Boutique GoTech · Colección Masculina"}
-              </p>
-              <h3
-                className={`font-playfair font-bold text-3xl md:text-4xl tracking-tight transition-colors duration-700 ${
-                  isMujer ? "text-[#5C0E32]" : "text-[#063020]"
-                }`}
-              >
-                {isMujer ? "Perfumes para Mujer" : "Perfumes para Hombre"}
-              </h3>
-              <p
-                className={`font-cormorant text-lg font-medium flex flex-wrap items-center gap-x-2.5 gap-y-1 transition-colors duration-700 ${
-                  isMujer ? "text-[#7E3B59]" : "text-[#355E4D]"
-                }`}
-              >
-                <span>Eau de Toilette 60 ml</span>
-              </p>
-            </div>
+          style={{
+            background:
+              "linear-gradient(180deg, #FDF2F0 0%, #FFF8F6 50%, #F9E5E1 100%)",
+          }}
+        />
+        <div
+          aria-hidden="true"
+          className={`pointer-events-none absolute inset-0 transition-opacity duration-700 ease-in-out ${
+            isMujer ? "opacity-0" : "opacity-100"
+          }`}
+          style={{
+            background:
+              "linear-gradient(180deg, #F7F5EE 0%, #FAF9F4 50%, #EDEAE0 100%)",
+          }}
+        />
 
-            <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3 shrink-0">
-              {standalone && (
-                <div className="relative">
-                  <Search
-                    className={`w-4 h-4 absolute left-3.5 top-1/2 -translate-y-1/2 transition-colors duration-700 ${
-                      isMujer ? "text-[#A62660]/70" : "text-[#0C593B]/70"
-                    }`}
-                  />
-                  <input
-                    type="text"
-                    value={search}
-                    onChange={(e) => setSearch(e.target.value)}
-                    placeholder="Buscar fragancia..."
-                    className={`w-full sm:w-52 bg-white border rounded-xl pl-9 pr-3.5 py-2 text-sm focus:outline-none transition-colors duration-700 ${
-                      isMujer
-                        ? "border-[#F0C4D7] text-[#5C0E32] placeholder-[#B07A92] focus:border-[#A62660]"
-                        : "border-[#C5DFD1] text-[#063020] placeholder-[#6B9382] focus:border-[#0B4A31]"
-                    }`}
-                  />
-                </div>
-              )}
+        <div className="relative z-10">
+          {/* Centered Luxury Segmented Toggle flanked by subtle hairlines */}
+          <div className="max-w-5xl mx-auto px-4 pt-6 sm:pt-8 pb-2">
+            <div className="flex items-center justify-center gap-3 sm:gap-6">
+              <span
+                aria-hidden="true"
+                className={`hidden sm:block flex-1 max-w-[140px] h-px transition-colors duration-700 ease-in-out ${
+                  isMujer ? "bg-[#C99B89]/60" : "bg-[#3F4D44]/40"
+                }`}
+              />
 
-              {/* Exclusively 2 Luxury Buttons: Hombre & Mujer */}
+              {/* Smoothly sliding luxury capsule toggle */}
               <div
-                className={`inline-flex items-center p-1.5 border rounded-xl transition-colors duration-700 ${
+                className={`relative grid grid-cols-2 items-center p-1 rounded-full border transition-all duration-700 ease-in-out shadow-[0_4px_18px_rgba(0,0,0,0.06)] ${
                   isMujer
-                    ? "bg-[#FBE4EE] border-[#F0C2D5]"
-                    : "bg-[#DFEFE7] border-[#C3DDD0]"
+                    ? "bg-[#FDF8F4] border-[#C8A158]"
+                    : "bg-[#FBF9F2] border-[#B6985A]"
                 }`}
                 role="tablist"
                 aria-label="Seleccionar colección Hombre o Mujer"
               >
+                {/* Sliding active pill backdrop */}
+                <span
+                  aria-hidden="true"
+                  className={`pointer-events-none absolute top-1 bottom-1 left-1 w-[calc(50%-4px)] rounded-full overflow-hidden transition-transform duration-500 ease-[cubic-bezier(0.22,1,0.36,1)] ${
+                    isMujer
+                      ? "translate-x-full shadow-[0_4px_14px_rgba(142,16,54,0.34)]"
+                      : "translate-x-0 shadow-[0_4px_14px_rgba(10,36,22,0.34)]"
+                  }`}
+                >
+                  <span
+                    className={`absolute inset-0 bg-gradient-to-r from-[#071D12] via-[#0F311F] to-[#17422B] transition-opacity duration-500 ease-in-out ${
+                      isMujer ? "opacity-0" : "opacity-100"
+                    }`}
+                  />
+                  <span
+                    className={`absolute inset-0 bg-gradient-to-r from-[#6A0A26] via-[#9D173F] to-[#BD2854] transition-opacity duration-500 ease-in-out ${
+                      isMujer ? "opacity-100" : "opacity-0"
+                    }`}
+                  />
+                </span>
+
                 {(
                   [
                     { id: "hombre", label: `Hombre (${hombreCount})` },
@@ -439,14 +359,12 @@ export default function PerfumesSection({
                       role="tab"
                       aria-selected={active}
                       onClick={() => setPerfumeGender(tab.id)}
-                      className={`font-playfair px-5 py-2 rounded-lg text-sm font-bold tracking-wider transition-all duration-500 whitespace-nowrap shrink-0 ${
+                      className={`relative z-10 font-luxury font-normal px-5 sm:px-9 py-2 sm:py-2.5 rounded-full text-sm sm:text-lg tracking-wide transition-colors duration-500 ease-in-out whitespace-nowrap shrink-0 text-center ${
                         active
-                          ? tab.id === "mujer"
-                            ? "bg-[#A62660] text-[#FFF8FB] shadow-[0_6px_16px_rgba(166,38,96,0.28)]"
-                            : "bg-[#0B4A31] text-[#F7FBF9] shadow-[0_6px_16px_rgba(11,74,49,0.28)]"
+                          ? "text-[#FFFDF9]"
                           : isMujer
-                            ? "text-[#7A3555] hover:text-[#5C0E32]"
-                            : "text-[#285240] hover:text-[#063020]"
+                            ? "text-[#2A181C] hover:text-[#8E1036]"
+                            : "text-[#19261E] hover:text-[#0B2819]"
                       }`}
                     >
                       {tab.label}
@@ -454,246 +372,333 @@ export default function PerfumesSection({
                   );
                 })}
               </div>
+
+              <span
+                aria-hidden="true"
+                className={`hidden sm:block flex-1 max-w-[140px] h-px transition-colors duration-700 ease-in-out ${
+                  isMujer ? "bg-[#C99B89]/60" : "bg-[#3F4D44]/40"
+                }`}
+              />
             </div>
           </div>
 
-          {/* Perfume Grid */}
-          {filtered.length === 0 ? (
-            <div
-              className={`bg-white/90 border rounded-2xl py-16 px-6 text-center transition-colors duration-700 ${
-                isMujer ? "border-[#F0C4D7]" : "border-[#C5DFD1]"
-              }`}
-            >
-              <p
-                className={`font-playfair text-2xl font-bold mb-2 ${
-                  isMujer ? "text-[#5C0E32]" : "text-[#063020]"
-                }`}
-              >
-                No encontramos fragancias con ese filtro
-              </p>
-              <p
-                className={`text-sm mb-4 ${
-                  isMujer ? "text-[#7E3B59]" : "text-[#355E4D]"
-                }`}
-              >
-                Prueba limpiando el buscador o cambiando entre Hombre y Mujer.
-              </p>
-              <button
-                type="button"
-                onClick={() => setSearch("")}
-                className={`font-playfair px-6 py-2.5 rounded-xl text-white text-sm font-bold tracking-wider transition-colors ${
-                  isMujer
-                    ? "bg-[#A62660] hover:bg-[#C23273]"
-                    : "bg-[#0B4A31] hover:bg-[#116443]"
-                }`}
-              >
-                Mostrar colección
-              </button>
-            </div>
-          ) : (
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
-              {filtered.map((product) => {
-                const inCart = items.find((i) => i.product.id === product.id);
-                const isItemHombre = product.category
-                  .toLowerCase()
-                  .includes("hombre");
-                const fixedPrice = Number(product.price);
-                const cardPalette = getPerfumeCardPalette(
-                  product.id,
-                  !isItemHombre
-                );
-
-                return (
-                  <article
-                    key={product.id}
-                    className={`group border rounded-2xl overflow-hidden hover:-translate-y-0.5 transition-all duration-500 flex flex-col ${cardPalette.card}`}
-                  >
-                    <Link
-                      to={`/producto/${product.id}`}
-                      className={`block relative aspect-square overflow-hidden transition-colors duration-700 ${cardPalette.imageBg}`}
-                    >
-                      <img
-                        src={product.image}
-                        alt={product.name}
-                        loading="lazy"
-                        referrerPolicy="no-referrer"
-                        className="w-full h-full object-cover object-center group-hover:scale-[1.03] transition-transform duration-500"
-                      />
-                      {product.stock === 0 && (
-                        <div
-                          className={`absolute inset-0 flex items-center justify-center ${cardPalette.overlayBg}`}
-                        >
-                          <span className="text-white font-playfair font-bold text-lg uppercase tracking-widest">
-                            Agotado
-                          </span>
-                        </div>
-                      )}
-                    </Link>
-
-                    <div className="p-5 flex-1 flex flex-col">
-                      <div
-                        className={`flex items-center gap-2 font-cinzel text-[10px] font-bold uppercase tracking-wider mb-1.5 transition-colors duration-700 ${cardPalette.eyebrow}`}
-                      >
-                        <span>{isItemHombre ? "Caballero" : "Dama"}</span>
-                        <span aria-hidden="true">·</span>
-                        <span>60 ml</span>
-                        <span aria-hidden="true">·</span>
-                        <span
-                          className={
-                            product.stock === 0
-                              ? "text-red-700"
-                              : cardPalette.availableText
-                          }
-                        >
-                          {product.stock === 0 ? "Agotado" : "Disponible"}
-                        </span>
-                      </div>
-
-                      <Link to={`/producto/${product.id}`}>
-                        <h3
-                          className={`font-playfair font-bold text-lg leading-snug mb-2 transition-colors ${cardPalette.title}`}
-                        >
-                          {product.name}
-                        </h3>
-                      </Link>
-
-                      <p
-                        className={`font-cormorant text-base font-medium leading-snug mb-4 line-clamp-2 transition-colors duration-700 ${cardPalette.description}`}
-                      >
-                        {product.features[0] || product.description}
-                      </p>
-
-                      <div
-                        className={`mt-auto pt-3 border-t space-y-3 transition-colors duration-700 ${cardPalette.divider}`}
-                      >
-                        <div className="flex items-baseline justify-between gap-2">
-                          <span
-                            className={`font-playfair font-bold text-2xl tabular-nums transition-colors duration-700 ${cardPalette.price}`}
-                          >
-                            ${fixedPrice.toFixed(2)}
-                          </span>
-                          <span
-                            className={`inline-flex items-center gap-1 text-[11px] font-semibold transition-colors duration-700 ${cardPalette.shippingBadge}`}
-                          >
-                            <Truck className="w-3.5 h-3.5" />
-                            Envío gratis
-                          </span>
-                        </div>
-
-                        <button
-                          type="button"
-                          onClick={() => product.stock > 0 && addToCart(product)}
-                          disabled={product.stock === 0}
-                          className={`font-playfair w-full flex items-center justify-center gap-2 rounded-xl py-2.5 px-4 text-sm font-bold tracking-wide transition-all duration-500 ${
-                            product.stock === 0
-                              ? cardPalette.btnDisabled
-                              : inCart
-                                ? cardPalette.btnInCart
-                                : cardPalette.btnDefault
-                          }`}
-                        >
-                          {product.stock === 0 ? (
-                            "Agotado"
-                          ) : inCart ? (
-                            <>
-                              <ShoppingCart className="w-3.5 h-3.5" />
-                              En carrito ({inCart.quantity})
-                            </>
-                          ) : (
-                            <>
-                              <Plus className="w-3.5 h-3.5" />
-                              Agregar al carrito
-                            </>
-                          )}
-                        </button>
-                      </div>
-                    </div>
-                  </article>
-                );
-              })}
-            </div>
-          )}
-
-          {/* Luxury Editorial Footer Bar */}
+          {/* Catalog Grid Container */}
           <div
-            className={`flex flex-col md:flex-row items-center justify-between gap-4 bg-white/95 border rounded-2xl px-6 py-5 transition-colors duration-700 ${
-              isMujer
-                ? "border-[#F0C4D7] shadow-[0_10px_28px_rgba(142,29,78,0.07)]"
-                : "border-[#C5DFD1] shadow-[0_10px_28px_rgba(6,48,32,0.07)]"
+            id="perfumes-catalogo"
+            className={`max-w-7xl mx-auto px-4 lg:px-8 space-y-8 scroll-mt-24 ${
+              standalone ? "pt-6 pb-14 md:pb-16" : "pt-6 pb-16 md:pb-20"
             }`}
           >
-            <div className="text-center md:text-left">
-              <p
-                className={`font-playfair font-bold text-lg transition-colors duration-700 ${
-                  isMujer ? "text-[#5C0E32]" : "text-[#063020]"
-                }`}
-              >
-                Aroma que deja huella · Entrega hoy en San Salvador
-              </p>
-              <p
-                className={`font-cormorant text-base font-medium mt-0.5 transition-colors duration-700 ${
-                  isMujer ? "text-[#7E3B59]" : "text-[#355E4D]"
-                }`}
-              >
-                Envío gratis en Salvador del Mundo (Gasolinera Texaco), Galerías Escalón, Torre Futura, 75 Av. Norte, Masferrer y Luceiro.
-              </p>
-            </div>
-            <div className="flex flex-wrap items-center justify-center gap-3 shrink-0">
-              <a
-                href={`https://wa.me/${WHATSAPP_NUMBER}?text=${encodeURIComponent(
-                  `Hola GoTech! Quisiera consultar por los perfumes para ${
-                    isMujer ? "mujer" : "hombre"
-                  } disponibles ($7.00).`
-                )}`}
-                target="_blank"
-                rel="noopener noreferrer"
-                className={`font-playfair px-5 py-2.5 rounded-xl text-white text-sm font-bold tracking-wide transition-colors duration-500 ${
-                  isMujer
-                    ? "bg-[#A62660] hover:bg-[#C23273]"
-                    : "bg-[#0B4A31] hover:bg-[#116443]"
-                }`}
-              >
-                Consultar por WhatsApp
-              </a>
-              {standalone ? (
-                <Link
-                  to="/catalogo"
-                  className={`font-playfair inline-flex items-center gap-1.5 px-4 py-2.5 rounded-xl border text-sm font-bold tracking-wide transition-colors duration-500 ${
+            {/* Editorial Collection Subheader + Search with Smooth Cross-fading Typography */}
+            <div
+              className={`flex flex-col sm:flex-row sm:items-end justify-between gap-4 border-b pb-5 transition-colors duration-700 ease-in-out ${
+                isMujer ? "border-[#EBD0C9]" : "border-[#D7D0BE]"
+              }`}
+            >
+              <div className="relative">
+                <h3
+                  aria-hidden={!isMujer}
+                  className={`font-luxury font-normal text-3xl sm:text-4xl lg:text-[44px] leading-[1.06] tracking-[0.015em] text-[#3B101C] transition-all duration-700 ease-in-out ${
                     isMujer
-                      ? "border-[#E3A9C3] text-[#5C0E32] hover:bg-[#FCE9F1]"
-                      : "border-[#A9CDBB] text-[#063020] hover:bg-[#E7F3EC]"
+                      ? "opacity-100 translate-y-0"
+                      : "opacity-0 -translate-y-2 pointer-events-none select-none"
                   }`}
                 >
-                  Ver catálogo tech <ArrowRight className="w-3.5 h-3.5" />
-                </Link>
-              ) : (
-                <Link
-                  to="/perfumes"
-                  className={`font-playfair inline-flex items-center gap-1.5 px-4 py-2.5 rounded-xl border text-sm font-bold tracking-wide transition-colors duration-500 ${
-                    isMujer
-                      ? "border-[#E3A9C3] text-[#5C0E32] hover:bg-[#FCE9F1]"
-                      : "border-[#A9CDBB] text-[#063020] hover:bg-[#E7F3EC]"
+                  Perfumes para Mujer
+                </h3>
+                <h3
+                  aria-hidden={isMujer}
+                  className={`absolute inset-0 font-luxury font-normal text-3xl sm:text-4xl lg:text-[44px] leading-[1.06] tracking-[0.015em] text-[#0D2016] transition-all duration-700 ease-in-out ${
+                    !isMujer
+                      ? "opacity-100 translate-y-0"
+                      : "opacity-0 translate-y-2 pointer-events-none select-none"
                   }`}
                 >
-                  Abrir sección Perfumes <ArrowRight className="w-3.5 h-3.5" />
-                </Link>
+                  Perfumes para Hombre
+                </h3>
+              </div>
+
+              {standalone && (
+                <div className="relative shrink-0">
+                  <Search
+                    className={`w-4 h-4 absolute left-3.5 top-1/2 -translate-y-1/2 transition-colors duration-700 ease-in-out ${
+                      isMujer ? "text-[#8E1036]/75" : "text-[#0F3822]/75"
+                    }`}
+                  />
+                  <input
+                    type="text"
+                    value={search}
+                    onChange={(e) => setSearch(e.target.value)}
+                    placeholder="Buscar fragancia..."
+                    className={`w-full sm:w-56 bg-white border rounded-full pl-9 pr-4 py-2 text-sm focus:outline-none transition-colors duration-700 ease-in-out ${
+                      isMujer
+                        ? "border-[#EBD0C9] text-[#3B101C] placeholder-[#A47A84] focus:border-[#8E1036]"
+                        : "border-[#D7D0BE] text-[#0D2016] placeholder-[#728277] focus:border-[#0B2819]"
+                    }`}
+                  />
+                </div>
               )}
+            </div>
+
+            {/* Perfume Grid with Smooth Staggered Reveal on Collection Switch */}
+            {filtered.length === 0 ? (
+              <div
+                key={`empty-${perfumeGender}`}
+                className={`perfume-card-reveal bg-white/95 border rounded-2xl py-16 px-6 text-center transition-colors duration-700 ease-in-out ${
+                  isMujer ? "border-[#EBD0C9]" : "border-[#D7D0BE]"
+                }`}
+              >
+                <p
+                  className={`font-luxury font-normal text-2xl mb-2 transition-colors duration-700 ${
+                    isMujer ? "text-[#3B101C]" : "text-[#0D2016]"
+                  }`}
+                >
+                  No encontramos fragancias con ese filtro
+                </p>
+                <p
+                  className={`text-sm mb-4 transition-colors duration-700 ${
+                    isMujer ? "text-[#7E4A56]" : "text-[#4A5D52]"
+                  }`}
+                >
+                  Prueba limpiando el buscador o cambiando entre Hombre y Mujer.
+                </p>
+                <button
+                  type="button"
+                  onClick={() => setSearch("")}
+                  className={`font-luxury font-normal px-6 py-2.5 rounded-full text-white text-sm tracking-wider transition-colors duration-500 ${
+                    isMujer
+                      ? "bg-[#8E1036] hover:bg-[#AA1B46]"
+                      : "bg-[#0B2819] hover:bg-[#144029]"
+                  }`}
+                >
+                  Mostrar colección
+                </button>
+              </div>
+            ) : (
+              <div
+                key={perfumeGender}
+                className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6"
+              >
+                {filtered.map((product, idx) => {
+                  const inCart = items.find((i) => i.product.id === product.id);
+                  const isItemHombre = product.category
+                    .toLowerCase()
+                    .includes("hombre");
+                  const fixedPrice = Number(product.price);
+                  const cardPalette = getPerfumeCardPalette(
+                    product.id,
+                    !isItemHombre
+                  );
+
+                  return (
+                    <article
+                      key={product.id}
+                      style={{ animationDelay: `${Math.min(idx, 7) * 55}ms` }}
+                      className={`perfume-card-reveal group border rounded-2xl overflow-hidden hover:-translate-y-0.5 transition-all duration-500 flex flex-col ${cardPalette.card}`}
+                    >
+                      <Link
+                        to={`/producto/${product.id}`}
+                        className={`block relative aspect-square overflow-hidden transition-colors duration-700 ${cardPalette.imageBg}`}
+                      >
+                        <img
+                          src={product.image}
+                          alt={product.name}
+                          loading="lazy"
+                          referrerPolicy="no-referrer"
+                          className="w-full h-full object-cover object-center group-hover:scale-[1.03] transition-transform duration-500"
+                        />
+                        {product.stock === 0 && (
+                          <div
+                            className={`absolute inset-0 flex items-center justify-center ${cardPalette.overlayBg}`}
+                          >
+                            <span className="text-white font-luxury font-normal text-lg uppercase tracking-widest">
+                              Agotado
+                            </span>
+                          </div>
+                        )}
+                      </Link>
+
+                      <div className="p-5 flex-1 flex flex-col">
+                        <div
+                          className={`flex items-center gap-2 font-montserrat text-[10px] font-medium uppercase tracking-[0.18em] mb-1.5 transition-colors duration-700 ${cardPalette.eyebrow}`}
+                        >
+                          <span>{isItemHombre ? "Caballero" : "Dama"}</span>
+                          <span aria-hidden="true">·</span>
+                          <span>60 ml</span>
+                          <span aria-hidden="true">·</span>
+                          <span
+                            className={
+                              product.stock === 0
+                                ? "text-red-700"
+                                : cardPalette.availableText
+                            }
+                          >
+                            {product.stock === 0 ? "Agotado" : "Disponible"}
+                          </span>
+                        </div>
+
+                        <Link to={`/producto/${product.id}`}>
+                          <h3
+                            className={`font-luxury font-normal text-lg sm:text-[19px] leading-snug tracking-[0.01em] mb-2 transition-colors duration-500 ${cardPalette.title}`}
+                          >
+                            {product.name}
+                          </h3>
+                        </Link>
+
+                        <p
+                          className={`font-cormorant text-base font-medium leading-snug mb-4 line-clamp-2 transition-colors duration-700 ${cardPalette.description}`}
+                        >
+                          {product.features[0] || product.description}
+                        </p>
+
+                        <div
+                          className={`mt-auto pt-3 border-t space-y-3 transition-colors duration-700 ${cardPalette.divider}`}
+                        >
+                          <div className="flex items-baseline justify-between gap-2">
+                            <span
+                              className={`font-luxury font-normal text-2xl tabular-nums transition-colors duration-700 ${cardPalette.price}`}
+                            >
+                              ${fixedPrice.toFixed(2)}
+                            </span>
+                            <span
+                              className={`inline-flex items-center gap-1 text-[11px] font-semibold transition-colors duration-700 ${cardPalette.shippingBadge}`}
+                            >
+                              <Truck className="w-3.5 h-3.5" />
+                              Envío gratis
+                            </span>
+                          </div>
+
+                          <button
+                            type="button"
+                            onClick={() =>
+                              product.stock > 0 && addToCart(product)
+                            }
+                            disabled={product.stock === 0}
+                            className={`font-bodoni w-full flex items-center justify-center gap-2 rounded-xl py-2.5 px-4 text-sm font-bold tracking-wide transition-all duration-500 ${
+                              product.stock === 0
+                                ? cardPalette.btnDisabled
+                                : inCart
+                                  ? cardPalette.btnInCart
+                                  : cardPalette.btnDefault
+                            }`}
+                          >
+                            {product.stock === 0 ? (
+                              "Agotado"
+                            ) : inCart ? (
+                              <>
+                                <ShoppingCart className="w-3.5 h-3.5" />
+                                En carrito ({inCart.quantity})
+                              </>
+                            ) : (
+                              <>
+                                <Plus className="w-3.5 h-3.5" />
+                                Agregar al carrito
+                              </>
+                            )}
+                          </button>
+                        </div>
+                      </div>
+                    </article>
+                  );
+                })}
+              </div>
+            )}
+
+            {/* Luxury Editorial Footer Bar */}
+            <div
+              className={`flex flex-col md:flex-row items-center justify-between gap-4 bg-white/95 border rounded-2xl px-6 py-5 transition-all duration-700 ease-in-out ${
+                isMujer
+                  ? "border-[#EBD0C9] shadow-[0_10px_28px_rgba(142,16,54,0.07)]"
+                  : "border-[#D7D0BE] shadow-[0_10px_28px_rgba(11,40,25,0.07)]"
+              }`}
+            >
+              <div className="text-center md:text-left">
+                <p
+                  className={`font-luxury font-normal text-xl tracking-[0.015em] transition-colors duration-700 ease-in-out ${
+                    isMujer ? "text-[#3B101C]" : "text-[#0D2016]"
+                  }`}
+                >
+                  Aroma que deja huella · Entrega hoy en San Salvador
+                </p>
+                <p
+                  className={`font-cormorant text-base font-medium mt-0.5 transition-colors duration-700 ease-in-out ${
+                    isMujer ? "text-[#7E4A56]" : "text-[#4A5D52]"
+                  }`}
+                >
+                  Envío gratis en Salvador del Mundo (Gasolinera Texaco), Galerías Escalón, Torre Futura, 75 Av. Norte, Masferrer y Luceiro.
+                </p>
+              </div>
+              <div className="flex flex-wrap items-center justify-center gap-3 shrink-0">
+                <a
+                  href={`https://wa.me/${WHATSAPP_NUMBER}?text=${encodeURIComponent(
+                    `Hola GoTech! Quisiera consultar por los perfumes para ${
+                      isMujer ? "mujer" : "hombre"
+                    } disponibles ($7.00).`
+                  )}`}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className={`relative overflow-hidden font-bodoni px-5 py-2.5 rounded-full text-white text-sm font-bold tracking-wide transition-all duration-700 ease-in-out border ${
+                    isMujer
+                      ? "border-[#C8A158]/50 bg-[#8E1036] hover:bg-[#AA1B46]"
+                      : "border-[#B6985A]/50 bg-[#0B2819] hover:bg-[#144029]"
+                  }`}
+                >
+                  Consultar por WhatsApp
+                </a>
+                {standalone ? (
+                  <Link
+                    to="/catalogo"
+                    className={`font-bodoni inline-flex items-center gap-1.5 px-4 py-2.5 rounded-full border text-sm font-bold tracking-wide transition-colors duration-700 ease-in-out ${
+                      isMujer
+                        ? "border-[#DFB7AE] text-[#3B101C] hover:bg-[#FDF2F0]"
+                        : "border-[#C6BEA8] text-[#0D2016] hover:bg-[#F7F5EE]"
+                    }`}
+                  >
+                    Ver catálogo tech <ArrowRight className="w-3.5 h-3.5" />
+                  </Link>
+                ) : (
+                  <Link
+                    to="/perfumes"
+                    className={`font-bodoni inline-flex items-center gap-1.5 px-4 py-2.5 rounded-full border text-sm font-bold tracking-wide transition-colors duration-700 ease-in-out ${
+                      isMujer
+                        ? "border-[#DFB7AE] text-[#3B101C] hover:bg-[#FDF2F0]"
+                        : "border-[#C6BEA8] text-[#0D2016] hover:bg-[#F7F5EE]"
+                    }`}
+                  >
+                    Abrir sección Perfumes <ArrowRight className="w-3.5 h-3.5" />
+                  </Link>
+                )}
+              </div>
             </div>
           </div>
         </div>
       </div>
 
-      {/* Band 3: Smooth Gradual Exit Back to Normal Light-Blue GoTech Catalog */}
+      {/* Band 3: Smooth Cross-fading Gradual Exit Back to Normal Light-Blue GoTech Catalog */}
       {!standalone && (
         <div
+          className="relative h-24 w-full overflow-hidden"
           aria-hidden="true"
-          className="h-24 w-full transition-colors duration-700"
-          style={{
-            background: isMujer
-              ? "linear-gradient(180deg, #FCE4EE 0%, #F4E8F4 48%, #ECF2FC 78%, #F4F8FF 100%)"
-              : "linear-gradient(180deg, #E2F0E9 0%, #E5EFF4 48%, #ECF3FC 78%, #F4F8FF 100%)",
-          }}
-        />
+        >
+          <div
+            className={`absolute inset-0 transition-opacity duration-700 ease-in-out ${
+              isMujer ? "opacity-100" : "opacity-0"
+            }`}
+            style={{
+              background:
+                "linear-gradient(180deg, #F9E5E1 0%, #F4E9F1 48%, #EDF2FC 78%, #F4F8FF 100%)",
+            }}
+          />
+          <div
+            className={`absolute inset-0 transition-opacity duration-700 ease-in-out ${
+              isMujer ? "opacity-0" : "opacity-100"
+            }`}
+            style={{
+              background:
+                "linear-gradient(180deg, #EDEAE0 0%, #ECEFF3 48%, #EDF3FC 78%, #F4F8FF 100%)",
+            }}
+          />
+        </div>
       )}
     </section>
   );

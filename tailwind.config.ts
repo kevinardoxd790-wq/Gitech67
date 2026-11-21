@@ -16,6 +16,8 @@ export default {
         playfair: ["Playfair Display", "Cormorant Garamond", "Georgia", "serif"],
         cinzel: ["Cinzel", "Playfair Display", "Georgia", "serif"],
         cormorant: ["Cormorant Garamond", "Playfair Display", "Georgia", "serif"],
+        luxury: ['"Abril Fatface"', '"Bodoni Moda"', "Georgia", "serif"],
+        bodoni: ['"Bodoni Moda"', '"Playfair Display"', "Georgia", "serif"],
       },
       colors: {
         neon: {

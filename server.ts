@@ -24,16 +24,6 @@ interface HistoryItemInput {
   text: string;
 }
 
-interface DeliveryContextInput {
-  hasLocation?: boolean;
-  customerAddress?: string;
-  distanceKm?: number;
-  withinCoverage?: boolean;
-  isFreeZone?: boolean;
-  coverageStatus?: string;
-  estimatedShippingUsd?: number;
-}
-
 const AI_TIMEOUT_MS = 14000;
 
 function extractJsonObject(rawText: string): Record<string, unknown> {
@@ -118,74 +108,17 @@ async function startServer() {
         })
         .join("\n");
 
-      const rawDelivery = body.deliveryContext as
-        | DeliveryContextInput
-        | undefined;
-      let deliveryContextBlock = "";
-      try {
-        if (rawDelivery && rawDelivery.hasLocation) {
-          const parts: string[] = [];
-          if (
-            typeof rawDelivery.customerAddress === "string" &&
-            rawDelivery.customerAddress.trim()
-          ) {
-            parts.push(
-              `Ubicación del cliente: ${rawDelivery.customerAddress
-                .trim()
-                .slice(0, 140)}`
-            );
-          }
-          if (typeof rawDelivery.distanceKm === "number") {
-            parts.push(
-              `Distancia calculada: ${rawDelivery.distanceKm.toFixed(2)} km`
-            );
-          }
-          if (typeof rawDelivery.coverageStatus === "string") {
-            parts.push(
-              `Estado de cobertura: ${rawDelivery.coverageStatus.slice(0, 120)}`
-            );
-          }
-          if (rawDelivery.isFreeZone === true) {
-            parts.push(
-              "Resultado de cobertura: PUNTO CON ENVÍO GRATIS ($0.00). Aplica envío gratis únicamente en ese punto exacto (no en cercanías)."
-            );
-          } else if (rawDelivery.withinCoverage === false) {
-            parts.push(
-              "Resultado de cobertura: Supera los 5.0 km. No se puede hacer el envío (consulta en WhatsApp)."
-            );
-          } else if (typeof rawDelivery.estimatedShippingUsd === "number") {
-            const snapped = Math.max(
-              1,
-              Math.round((rawDelivery.estimatedShippingUsd + Number.EPSILON) * 2) / 2
-            );
-            const cleanPrice = Number.isInteger(snapped)
-              ? `$${snapped}`
-              : `$${snapped.toFixed(2)}`;
-            parts.push(
-              `Estimación de envío calculada: ${cleanPrice} USD (es una estimación y el precio final se debe acordar en WhatsApp)`
-            );
-          }
-          if (parts.length > 0) {
-            deliveryContextBlock = `\n\nUBICACIÓN Y COBERTURA ACTUAL DEL CLIENTE:\n- ${parts.join(
-              "\n- "
-            )}`;
-          }
-        }
-      } catch {
-        deliveryContextBlock = "";
-      }
-
       const systemInstruction = `Asistente virtual exclusivo de GoTech SV (tienda tech en San Salvador).
 Responde en español claro, directo y amable (máximo 3 oraciones).
 
 LÍMITE ESTRICTO DE TEMAS:
 - Atiende SOLO consultas sobre catálogo GoTech, precios, disponibilidad, envíos en San Salvador, carrito y soporte/problemas o reembolsos de compras GoTech.
 - NUNCA menciones cantidades numéricas de existencias o stock al cliente; solo indica si está Disponible o Agotado.
-- NUNCA menciones ni reveles direcciones de origen internas ni puntos de salida de la tienda; comparte únicamente la información del cliente, distancia calculada, cobertura (límite 5 km) y envío aproximado.
+- NUNCA menciones ni reveles direcciones de origen internas ni puntos de salida de la tienda.
 - PROHIBIDO responder historia (ej. Cristóbal Colón), geografía, tareas escolares, ciencia o cultura general. Para temas ajenos, declina cortésmente y devuelve "acciones": [].
 
 PRECIOS FIJOS (SIN CUPONES NI DESCUENTOS):
-- Todos los precios y envíos son fijos. Nunca menciones ni ofrezcas cupones, códigos o descuentos.
+- Todos los precios son fijos. Nunca menciones ni ofrezcas cupones, códigos o descuentos.
 
 POLÍTICA DE REEMBOLSOS, GARANTÍA Y PROBLEMAS:
 - Si el cliente pide reembolso, devolución, cambio, garantía o reporta que un producto salió malo/defectuoso/dañado o tiene un problema con su compra:
@@ -195,13 +128,10 @@ POLÍTICA DE REEMBOLSOS, GARANTÍA Y PROBLEMAS:
 CATÁLOGO REAL:
 ${catalogText || "Sin productos."}
 
-ENVÍOS Y COBERTURA:
-- Envío GRATIS únicamente en estos 6 puntos exactos: Salvador del Mundo (Gasolinera Texaco), Galerías Escalón, Torre Futura, 75 Av. Norte (Gasolinera), Redondel Masferrer y Redondel Luceiro.
-- IMPORTANTE: El envío gratis aplica SOLO en el punto exacto. Si el cliente pide en cercanías o alrededores de esos puntos (ej. "cerca de Galerías", "por Torre Futura", "atrás de Masferrer", etc.), NO es gratis; aplica el cálculo por distancia.
+ENVÍOS Y UBICACIÓN:
+- Envío GRATIS para todos los productos, sin mínimo ni límite de precio, en TODAS las zonas principales: Salvador del Mundo (Gasolinera Texaco), Galerías Escalón, Torre Futura, 75 Av. Norte, Redondel Masferrer y Redondel Luceiro.
 - Colonia Escalón: $1.50 extra.
-- Para ubicación personalizada dentro de 5.0 km (que no sea punto gratis): Regla interna: nunca cotices menos de $1 USD y usa siempre montos limpios de $0.50 en $0.50 ($1, $1.50, $2, $2.50, etc., nunca centavos sueltos). PROHIBIDO mencionar al cliente que existe un mínimo de $1 o tarifa mínima; ese mínimo es solo regla interna. DEBES aclarar explícitamente que el monto mostrado es una estimación y que el precio final se debe acordar en WhatsApp.
-- Si supera los 5.0 km (withinCoverage = false): DEBES responder claramente que no se puede hacer el envío (consulta en WhatsApp), sin ofrecer precio ni estimación de envío.
-- Si existe "UBICACIÓN Y COBERTURA ACTUAL DEL CLIENTE" abajo: si indica PUNTO CON ENVÍO GRATIS, confirma que el envío es GRATIS en ese punto exacto (aclarando que cercanías no aplican); si está dentro de 5 km con costo, indica ubicación, distancia, estimación en formato limpio y aclara que es una estimación cuyo precio final se acuerda en WhatsApp (sin decir que hay mínimo de $1); si supera los 5 km, indica la distancia y responde exactamente que no se puede hacer el envío (consulta en WhatsApp). Si pregunta sin indicar dirección, menciona las zonas gratis (solo en el punto exacto), Colonia Escalón ($1.50) e invítalo a escribir su ubicación aquí.${deliveryContextBlock}
+- Para cualquier otra dirección o ubicación, indícale al cliente que puede abrir el carrito, seleccionar su punto de entrega directamente en el mapa interactivo y coordinar el envío por WhatsApp (nunca calcules distancias en km ni precios estimados por km).
 
 FORMATO JSON OBLIGATORIO:
 { "respuesta": "...", "acciones": [...] }
@@ -629,203 +559,7 @@ FORMATO JSON OBLIGATORIO:
     }
   });
 
-  // Cotización inteligente de envío con Gemini 3.1: precio atractivo al cliente, pago justo al repartidor y margen sostenible
-  app.post("/api/ai/shipping-quote", async (req, res) => {
-    try {
-      const apiKey = process.env.GEMINI_API_KEY;
-      if (!apiKey) {
-        return res.status(503).json({
-          error: "Servicio de IA no configurado en el servidor.",
-        });
-      }
 
-      const body = req.body ?? {};
-      const distanceKm = Number(body.distanceKm);
-      const subtotal = Number(body.subtotal ?? 0);
-      const itemCount = Number(body.itemCount ?? 1);
-      const withinCoverage = Boolean(body.withinCoverage);
-      const baseShippingUsd = Number(body.baseShippingUsd ?? 0);
-      const customerAddress =
-        typeof body.customerAddress === "string"
-          ? body.customerAddress.trim().slice(0, 140)
-          : "";
-
-      if (!Number.isFinite(distanceKm) || distanceKm < 0) {
-        return res.status(400).json({ error: "Distancia inválida." });
-      }
-
-      const safeSubtotal =
-        Number.isFinite(subtotal) && subtotal >= 0 ? subtotal : 0;
-      const safeItemCount =
-        Number.isFinite(itemCount) && itemCount >= 1
-          ? Math.round(itemCount)
-          : 1;
-      const safeBase =
-        Number.isFinite(baseShippingUsd) && baseShippingUsd >= 0
-          ? baseShippingUsd
-          : Math.round((0.5 + distanceKm * 0.6) * 100) / 100;
-
-      const ai = getAiClient(apiKey);
-
-      const round2 = (n: number) =>
-        Math.round((n + Number.EPSILON) * 100) / 100;
-
-      const systemInstruction = `Eres el motor de cálculo logístico y precios de envío de GoTech SV en San Salvador, El Salvador.
-Debes calcular un desglose justo y equilibrado en USD considerando:
-1. PRECIO EXCELENTE AL CONSUMIDOR: Tarifa competitiva, clara y atractiva para el cliente según su distancia y monto de compra, que incentive a completar el pedido sin sentirse caro.
-2. COMPENSACIÓN JUSTA AL REPARTIDOR: Debe cubrir combustible, desgaste de moto/vehículo, tiempo en tráfico de San Salvador y entrega en mano (proporcional a la distancia).
-3. GANANCIA SOSTENIBLE PARA LA TIENDA: Debe dejar un margen operativo positivo razonable para GoTech SV sobre el servicio de envío.
-
-REGLAS ESTRICTAS:
-- PISO INTERNO $1 USD: "shippingPriceUsd" NUNCA puede ser menor a 1.00 USD (regla interna del sistema).
-- MONTO LIMPIO SIN CENTAVOS SUELTOS: "shippingPriceUsd" DEBE ser SIEMPRE un múltiplo exacto de $0.50 USD desde 1.00 en adelante (únicamente valores como 1, 1.5, 2, 2.5, 3, 3.5, 4, etc.; PROHIBIDO usar centavos sueltos como 1.25, 1.75, 2.15 o 2.25).
-- ESTIMACIÓN A ACORDAR EN WHATSAPP (SIN MENCIONAR MÍNIMOS): En "consumerSummary" y "pricingNote" DEBES indicar siempre que el monto calculado es una estimación y que el precio final se debe acordar en WhatsApp (tanto dentro como fuera de 5 km), pero NUNCA escribas ni reveles en esos textos que existe un mínimo de $1.
-- CERO cupones, códigos promocionales ni descuentos sobre los productos.
-- NUNCA menciones direcciones de origen ni puntos de partida de la tienda.
-- Coherencia matemática obligatoria: shippingPriceUsd = driverCompensationUsd + storeMarginUsd (todos > 0).
-- Si withinCoverage es false (> 5.0 km), calcula un estimado referencial >= 1 en múltiplos de $0.50 aclarando que supera los 5 km de cobertura directa y que el precio final se acuerda en WhatsApp.
-- Responde en español breve, profesional y claro.`;
-
-      const userPrompt = JSON.stringify({
-        distanceKm: round2(distanceKm),
-        withinCoverage,
-        maxDirectCoverageKm: 5.0,
-        orderSubtotalUsd: round2(safeSubtotal),
-        itemCount: safeItemCount,
-        referenceBaselineUsd: round2(safeBase),
-        customerZoneOrAddress: customerAddress || "Ubicación personalizada",
-      });
-
-      const controller = new AbortController();
-      const timeoutId = setTimeout(() => controller.abort(), 14000);
-      let response;
-      try {
-        response = await ai.models.generateContent({
-          model: "gemini-3.1-flash-lite",
-          contents: [
-            {
-              role: "user",
-              parts: [
-                {
-                  text: `Calcula el costo óptimo de envío, pago al repartidor y ganancia operativa para este pedido:\n${userPrompt}`,
-                },
-              ],
-            },
-          ],
-          config: {
-            systemInstruction,
-            thinkingConfig: { thinkingLevel: ThinkingLevel.MINIMAL },
-            responseMimeType: "application/json",
-            abortSignal: controller.signal,
-            responseSchema: {
-              type: Type.OBJECT,
-              properties: {
-                shippingPriceUsd: {
-                  type: Type.NUMBER,
-                  description:
-                    "Precio final excelente para el consumidor en USD (2 decimales).",
-                },
-                driverCompensationUsd: {
-                  type: Type.NUMBER,
-                  description:
-                    "Pago justo destinado al repartidor en USD (2 decimales).",
-                },
-                storeMarginUsd: {
-                  type: Type.NUMBER,
-                  description:
-                    "Ganancia o margen operativo que queda para la tienda en USD (2 decimales).",
-                },
-                consumerSummary: {
-                  type: Type.STRING,
-                  description:
-                    "Explicación breve y amigable para el consumidor (máx 1 oración).",
-                },
-                pricingNote: {
-                  type: Type.STRING,
-                  description:
-                    "Nota breve sobre equilibrio entre consumidor, repartidor y ganancia (máx 1 oración).",
-                },
-              },
-              required: [
-                "shippingPriceUsd",
-                "driverCompensationUsd",
-                "storeMarginUsd",
-                "consumerSummary",
-                "pricingNote",
-              ],
-            },
-          },
-        });
-      } finally {
-        clearTimeout(timeoutId);
-      }
-
-      const rawText = (response.text ?? "").trim();
-      const parsed = extractJsonObject(rawText);
-
-      const rawDriver = Number(parsed?.driverCompensationUsd);
-      const rawMargin = Number(parsed?.storeMarginUsd);
-      const rawTotal = Number(parsed?.shippingPriceUsd);
-
-      if (
-        !Number.isFinite(rawDriver) ||
-        !Number.isFinite(rawMargin) ||
-        !Number.isFinite(rawTotal) ||
-        rawDriver <= 0 ||
-        rawMargin <= 0 ||
-        rawTotal <= 0
-      ) {
-        return res.status(502).json({
-          error: "La IA devolvió montos inválidos para el cálculo de envío.",
-        });
-      }
-
-      const shippingPriceUsd = Math.max(
-        1,
-        Math.round((rawTotal + Number.EPSILON) * 2) / 2
-      );
-      const ratio = rawDriver / (rawDriver + rawMargin);
-      const driverCompensationUsd = round2(
-        Math.max(0.5, shippingPriceUsd * ratio)
-      );
-      const storeMarginUsd = round2(
-        Math.max(0.1, shippingPriceUsd - driverCompensationUsd)
-      );
-
-      const consumerSummary =
-        typeof parsed?.consumerSummary === "string" &&
-        parsed.consumerSummary.trim()
-          ? parsed.consumerSummary.trim().slice(0, 180)
-          : "Estimación calculada por distancia; el precio final se acuerda en WhatsApp.";
-
-      const pricingNote =
-        typeof parsed?.pricingNote === "string" && parsed.pricingNote.trim()
-          ? parsed.pricingNote.trim().slice(0, 200)
-          : "Estimación por distancia a confirmar y acordar por WhatsApp.";
-
-      return res.json({
-        shippingPriceUsd,
-        driverCompensationUsd,
-        storeMarginUsd,
-        consumerSummary,
-        pricingNote,
-        model: "gemini-3.1-flash-lite",
-      });
-    } catch (error) {
-      const isAbort =
-        error instanceof Error &&
-        (error.name === "AbortError" ||
-          error.message.toLowerCase().includes("abort"));
-      if (res.headersSent || res.writableEnded) {
-        return;
-      }
-      return res.status(isAbort ? 504 : 502).json({
-        error: isAbort
-          ? "El cálculo de envío con IA tardó demasiado."
-          : "No se pudo calcular la tarifa optimizada con Gemini 3.1.",
-      });
-    }
-  });
 
   if (process.env.NODE_ENV !== "production") {
     const vite = await createViteServer({
